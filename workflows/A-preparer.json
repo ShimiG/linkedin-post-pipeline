@@ -1,0 +1,1801 @@
+{
+  "name": "A – Preparer (pop topic, draft, send for approval)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1,3,5"
+            }
+          ]
+        }
+      },
+      "id": "79ab029b-37ce-4bb0-b1ab-72cfad325b41",
+      "name": "Schedule Mon/Wed/Fri 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9cdc899a-cd2d-48ec-b867-b878e26108b8",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0f0ecd1d-6c26-44fc-a9b1-bde8bb91adf6",
+              "name": "TIMEZONE",
+              "value": "UTC",
+              "type": "string"
+            },
+            {
+              "id": "3ee32540-054b-42df-9809-d15e7d324c4b",
+              "name": "STALE_CLAIM_HOURS",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "1f4a4c5a-8be8-48b1-8998-84444597d490",
+              "name": "CLAIM_SETTLE_SECONDS",
+              "value": 2,
+              "type": "number"
+            },
+            {
+              "id": "e75adff8-4971-4a0a-a3ce-c686d6666cfb",
+              "name": "NEWS_MIN_SCORE",
+              "value": 0.5,
+              "type": "number"
+            },
+            {
+              "id": "8f47ab01-51cb-408e-b2ad-03b384867edd",
+              "name": "NEWS_MAX_RESULTS",
+              "value": 5,
+              "type": "number"
+            },
+            {
+              "id": "55fd17c6-d7b9-4897-a756-b599d60ea97b",
+              "name": "NEWS_TIME_RANGE",
+              "value": "month",
+              "type": "string"
+            },
+            {
+              "id": "02a144bb-ffed-4d70-a254-9bd34cb1066c",
+              "name": "LLM_PRIMARY",
+              "value": "groq",
+              "type": "string"
+            },
+            {
+              "id": "945bc7a0-b2c8-4991-b9ea-bc6ba08d8a15",
+              "name": "LLM_FALLBACK",
+              "value": "gemini",
+              "type": "string"
+            },
+            {
+              "id": "bf3d5f2f-b49b-471a-a482-bb5c03a59dfb",
+              "name": "GROQ_MODEL",
+              "value": "openai/gpt-oss-120b",
+              "type": "string"
+            },
+            {
+              "id": "2404cec9-a9dc-4f0f-a3de-63eb5134012b",
+              "name": "GROQ_API_URL",
+              "value": "https://api.groq.com/openai/v1/chat/completions",
+              "type": "string"
+            },
+            {
+              "id": "1baa74e1-2557-4698-9f68-f1a83008b57e",
+              "name": "GEMINI_MODEL",
+              "value": "gemini-3.5-flash-lite",
+              "type": "string"
+            },
+            {
+              "id": "5d91b91d-119e-4aff-b5ed-81f68a120419",
+              "name": "GEMINI_API_BASE",
+              "value": "https://generativelanguage.googleapis.com/v1beta/models",
+              "type": "string"
+            },
+            {
+              "id": "77743ebb-ba46-4649-a8f3-ec5017190cf7",
+              "name": "LLM_TEMPERATURE",
+              "value": 0.6,
+              "type": "number"
+            },
+            {
+              "id": "beef604f-49c3-4e92-b536-048137345b3c",
+              "name": "LLM_RETRY_TEMPERATURE",
+              "value": 0.2,
+              "type": "number"
+            },
+            {
+              "id": "cb97715c-8ed1-4097-802a-4f2fb6d0fe4a",
+              "name": "LLM_MAX_ATTEMPTS",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "00f596be-5ca5-4201-b5e5-c4b57f57fc61",
+              "name": "POST_MAX_CHARS",
+              "value": 1300,
+              "type": "number"
+            },
+            {
+              "id": "857f111e-e071-4164-a9aa-219ca91a2b8c",
+              "name": "MAX_HASHTAGS",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "1fe6e75a-8e3c-472c-9b6d-87080eaf9369",
+              "name": "POST_SIGNATURE",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "309c3f97-b864-4209-af6f-077bad07b836",
+              "name": "SLACK_APPROVALS_CHANNEL",
+              "value": "C_APPROVALS_REPLACE_ME",
+              "type": "string"
+            },
+            {
+              "id": "55b6af58-0a7a-4ea9-a77e-893cc51f5b41",
+              "name": "SLACK_ALERTS_CHANNEL",
+              "value": "C_ALERTS_REPLACE_ME",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "57bb79c6-4b9f-424e-8dbb-9c662a78e1a2",
+      "name": "CONFIG",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "search",
+        "filterByFormula": "=OR({status}='queued', AND({status}='processing', IS_BEFORE({claimed_at}, DATEADD(NOW(), -{{ $('CONFIG').first().json.STALE_CLAIM_HOURS }}, 'hours'))))",
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "a508d08a-4e6d-405b-884d-b287779112dd",
+      "name": "SEARCH STACK",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        0
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// POP TOP\n// The stack: newest queued row first; a pinned row beats everything. Exactly one topic leaves this node per run.\nconst rows = $input.all().map(i => i.json).filter(r => r && r.id);\nconst ts = (r) => { const d = DateTime.fromISO(String(r.created_at || r.createdTime || '')); return d.isValid ? d.toMillis() : 0; };\nrows.sort((a, b) => (Number(!!b.pinned) - Number(!!a.pinned)) || (ts(b) - ts(a)));\nif (!rows.length) return [{ json: { empty: true, stack_size: 0 } }];\nconst top = rows[0];\nreturn [{ json: { ...top, empty: false, stack_size: rows.length, was_stale_claim: top.status === 'processing' } }];\n"
+      },
+      "id": "971bde75-f25a-4b8c-831c-17953d0afffd",
+      "name": "POP TOP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6bf213f4-66b0-46b9-95bf-9b4f2f3942b7",
+              "leftValue": "={{ $json.empty !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9b2bccc3-f676-42e8-82d9-abdeb21a33ac",
+      "name": "IF STACK NOT EMPTY",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a9f0a86d-af4a-4f5e-96fd-0a4789b0840a",
+      "name": "Stack empty, nothing to do",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "update",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "processing",
+            "execution_id": "={{ $execution.id }}",
+            "claimed_at": "={{ $now.toUTC().toISO() }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "claimed_at",
+              "displayName": "claimed_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "3786e0f0-6e57-4c24-ba6b-471d0a99a3d9",
+      "name": "CLAIM",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        0
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('CONFIG').first().json.CLAIM_SETTLE_SECONDS }}",
+        "unit": "seconds"
+      },
+      "id": "cb570122-fd3a-409a-91be-abe365a39311",
+      "name": "CLAIM SETTLE",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "get",
+        "id": "={{ $('POP TOP').first().json.id }}",
+        "options": {}
+      },
+      "id": "2e33be5b-0f7d-42d6-ab12-e903ca9ff145",
+      "name": "READ-BACK",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        0
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3f79d17c-b2cb-48f1-ad6a-2c2c09573b93",
+              "leftValue": "={{ String($json.fields?.execution_id ?? $json.execution_id ?? '') }}",
+              "rightValue": "={{ String($execution.id) }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "921819ce-58ee-41a7-b575-50e6f2e4e24d",
+              "leftValue": "={{ $json.fields?.status ?? $json.status }}",
+              "rightValue": "processing",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "682c1ff9-cd60-4985-b3f2-4558393ebdf0",
+      "name": "IF CLAIM WON",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "83586d60-0f58-491a-b85f-191044506c00",
+      "name": "Lost claim, stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c626c033-47dc-458d-8917-a960390b7721",
+              "leftValue": "={{ ['personal','general'].includes(String($json.fields?.scope ?? $json.scope ?? '')) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "d0f65594-98f3-47b9-885f-78edab0ac2d6",
+      "name": "IF SCOPE SET",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CLASSIFY REQUEST (Groq, temperature 0, JSON mode). Runs only when the row has no scope.\nconst cfg = $('CONFIG').first().json;\nconst rec = $input.first().json; const f = rec.fields || rec;\nconst CLASSIFIER = \"You classify LinkedIn post ideas for one person's personal profile. Given a topic title, optional notes and an optional category, answer with JSON only:\\n{ \\\"scope\\\": \\\"personal\\\" | \\\"general\\\", \\\"category\\\": \\\"job_search\\\" | \\\"project\\\" | \\\"fun_fact\\\" | \\\"dev_stat\\\" | \\\"opinion\\\" | \\\"other\\\", \\\"reason\\\": \\\"<one short sentence>\\\" }\\nscope is \\\"personal\\\" when the post is about the author: their job search, availability, career, their own projects, lessons, or achievements. scope is \\\"general\\\" when the post is about the outside world: industry news, a technology, a statistic, a fun fact, or an opinion about a public topic. If a category is given, keep it unless it is clearly wrong.\";\nconst user = 'Classify this topic:\\n' + JSON.stringify({ title: f.topic, notes: f.angle || '', category: f.category || null }, null, 2) + '\\n\\nReturn the JSON object only.';\nconst model = String(cfg.GROQ_MODEL || 'openai/gpt-oss-120b');\nconst request_body = { model, temperature: 0, max_tokens: 300, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: CLASSIFIER }, { role: 'user', content: user }] };\nif (model.includes('gpt-oss')) request_body.reasoning_effort = 'low';\nreturn [{ json: { request_body, url: String(cfg.GROQ_API_URL) } }];\n"
+      },
+      "id": "cbd80882-27ca-42e0-ae8b-f3afbb168c6c",
+      "name": "CLASSIFY REQUEST",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "efaa8688-ac71-4dc4-ab9d-29900fb5c01e",
+      "name": "GROQ CLASSIFY",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        180
+      ],
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PARSE CLASSIFICATION\n// LLM answer -> { scope, category }. If the call failed or answered nonsense, a keyword rule decides and the reviewer is told.\nconst resp = $input.first().json || {};\nconst rec = $('READ-BACK').first().json; const f = rec.fields || rec;\nconst CATS = ['job_search','project','fun_fact','dev_stat','opinion','other'];\nlet scope = null, category = f.category ? String(f.category) : null, scope_source = 'llm', reason = '';\ntry {\n  if (resp.error) throw new Error(typeof resp.error === 'string' ? resp.error : (resp.error.message || JSON.stringify(resp.error)));\n  const out = JSON.parse(resp?.choices?.[0]?.message?.content || '');\n  scope = out.scope === 'personal' ? 'personal' : out.scope === 'general' ? 'general' : null;\n  if (!category && CATS.includes(String(out.category))) category = String(out.category);\n  reason = String(out.reason || '').slice(0, 200);\n} catch (e) { reason = 'classifier failed: ' + String(e.message || e).slice(0, 200); }\nif (!scope) {\n  scope_source = 'fallback';\n  const hay = (String(f.topic || '') + ' ' + String(f.angle || '')).toLowerCase();\n  const personal = /(^|[^a-z])(i|i'm|im|me|my|myself|open to work|looking for|i built|i made|my project|lesson i)([^a-z]|$)/.test(hay) || ['job_search','project'].includes(category || '');\n  scope = personal ? 'personal' : 'general';\n}\nif (!category) category = 'other';\nreturn [{ json: { scope, category, scope_source, classify_reason: reason } }];\n"
+      },
+      "id": "eda95a2e-3f3e-4cdc-842d-788cc7c2276c",
+      "name": "PARSE CLASSIFICATION",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// TOPIC READY\n// One normalised topic object, whatever decided the scope (the row itself or the classifier).\nconst rec = $('READ-BACK').first().json; const f = rec.fields || rec;\nlet cls = null; try { cls = $('PARSE CLASSIFICATION').first().json; } catch (e) { cls = null; }\nconst rowScope = ['personal','general'].includes(String(f.scope || '')) ? String(f.scope) : null;\nconst scope = rowScope || (cls && cls.scope) || 'general';\nconst scope_source = rowScope ? 'row' : (cls ? cls.scope_source : 'fallback');\nconst category = String(f.category || (cls && cls.category) || 'other');\nreturn [{ json: {\n  id: rec.id, topic: String(f.topic || '').trim(), category, scope, scope_source,\n  classify_reason: cls ? cls.classify_reason : '',\n  angle: String(f.angle || '').trim(),\n  news_query: String(f.news_query || f.topic || '').trim(),\n  is_personal: scope === 'personal',\n  stack_size: (() => { try { return $('POP TOP').first().json.stack_size; } catch (e) { return null; } })(),\n} }];\n"
+      },
+      "id": "ed63ff7e-a99c-47ae-b930-6ed3e231a19e",
+      "name": "TOPIC READY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "update",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "scope": "={{ $json.scope }}",
+            "category": "={{ $json.category }}",
+            "scope_source": "={{ $json.scope_source }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "scope",
+              "displayName": "scope",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "scope_source",
+              "displayName": "scope_source",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "723df529-0521-48bf-bf7d-8eb8d27a6f5c",
+      "name": "SAVE SCOPE",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        3360,
+        0
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblPROFILE_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "search",
+        "filterByFormula": "={active}=1",
+        "returnAll": true,
+        "options": {}
+      },
+      "id": "9e60bbb8-9d88-4da2-9e67-e50ef95f5f67",
+      "name": "PROFILE LOOKUP",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        3600,
+        0
+      ],
+      "retryOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// PROFILE READY\n// Personal post: every active profile row. General post: only rows marked use_for = always (name, headline), so the voice stays the author's.\nconst t = $('TOPIC READY').first().json;\nconst rows = $input.all().map(i => i.json).filter(r => r && r.id && r.key);\nconst keep = rows.filter(r => t.is_personal || String(r.use_for || 'always') === 'always');\nconst author = {};\nkeep.forEach(r => { author[String(r.key).trim()] = String(r.value || '').trim(); });\nreturn [{ json: { ...t, author, author_rows: keep.length, profile_rows_total: rows.length,\n  author_text: Object.entries(author).map(([k, v]) => `${k}: ${v}`).join('\\n') } }];\n"
+      },
+      "id": "dd7f35be-d333-4c53-a4db-19e39736a240",
+      "name": "PROFILE READY",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3840,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ef5d39e0-feee-4294-aeff-79afcb4052e1",
+              "leftValue": "={{ $json.is_personal !== true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "d8ec7cbf-fedf-487b-b0fe-e132ff2b044e",
+      "name": "IF GENERAL",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4080,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "={{ $('PROFILE READY').first().json.news_query }}",
+        "options": {
+          "topic": "news",
+          "time_range": "={{ $('CONFIG').first().json.NEWS_TIME_RANGE }}",
+          "search_depth": "basic",
+          "max_results": "={{ $('CONFIG').first().json.NEWS_MAX_RESULTS }}",
+          "include_raw_content": false
+        }
+      },
+      "id": "6b557b6b-0ea5-4f75-be71-c1d07b8e631e",
+      "name": "TAVILY NEWS SEARCH",
+      "type": "@tavily/n8n-nodes-tavily.tavily",
+      "typeVersion": 2.1,
+      "position": [
+        4320,
+        0
+      ],
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// NORMALIZE NEWS\n// General post: input is the Tavily response. Personal post: input is PROFILE READY (no results) -> zero news, no search was made.\n// Tavily never returns an empty list, so relevance is computed: score >= NEWS_MIN_SCORE and a query token in title/content.\nconst cfg = $('CONFIG').first().json;\nconst t = $('PROFILE READY').first().json;\nconst resp = $input.first().json || {};\nconst minScore = Number(cfg.NEWS_MIN_SCORE ?? 0.5);\nconst STOP = new Set(['the','and','for','with','from','that','this','what','why','how','about','into','your','you','are','is','of','to','in','on','a','an','new','news','2025','2026','2027']);\nconst tokens = (s) => String(s || '').toLowerCase().replace(/[^\\p{L}\\d\\s]/gu, ' ').split(/\\s+/).filter(w => w.length >= 3 && !STOP.has(w));\nconst want = new Set(tokens(t.news_query));\nconst mentions = (r) => { const hay = (String(r.title || '') + ' ' + String(r.content || '')).toLowerCase(); for (const w of want) if (hay.includes(w)) return true; return want.size === 0; };\nconst host = (u) => { const m = String(u || '').match(/^[a-z]+:\\/\\/([^\\/?#]+)/i); return m ? m[1].toLowerCase().replace(/^www\\./, '') : ''; };\nconst isoDate = (d) => { if (!d) return null; let x = DateTime.fromISO(String(d)); if (!x.isValid) x = DateTime.fromRFC2822(String(d)); if (!x.isValid) x = DateTime.fromHTTP(String(d)); if (!x.isValid) { const j = new Date(String(d)); if (!isNaN(j.getTime())) x = DateTime.fromJSDate(j); } return x.isValid ? x.toUTC().toISODate() : String(d); };\nconst searched = t.is_personal !== true;\nlet error = null;\nif (searched && resp.error) error = typeof resp.error === 'string' ? resp.error : (resp.error.message || JSON.stringify(resp.error));\nconst results = searched && Array.isArray(resp.results) ? resp.results : [];\nconst kept = results\n  .filter(r => Number(r.score || 0) >= minScore && mentions(r))\n  .map(r => ({ title: r.title || '', source: host(r.url), date: isoDate(r.published_date), snippet: String(r.content || '').slice(0, 400), url: r.url, score: Math.round(Number(r.score || 0) * 1000) / 1000 }))\n  .sort((a, b) => b.score - a.score);\nreturn [{ json: { id: t.id, searched, news_items: kept, news_json: JSON.stringify(kept), news_count: kept.length, has_news: kept.length > 0, news_raw_count: results.length, news_error: error } }];\n"
+      },
+      "id": "10b8cc9a-6572-416d-9301-e7bbc6fad94d",
+      "name": "NORMALIZE NEWS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "update",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "news_json": "={{ $json.news_json }}",
+            "news_count": "={{ $json.news_count }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "news_json",
+              "displayName": "news_json",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "news_count",
+              "displayName": "news_count",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "863bd2ec-7014-4e97-862d-cc74486e292f",
+      "name": "SAVE NEWS",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        4800,
+        0
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD PROMPT\n// First attempt: input is the SAVE NEWS record. Retry: input is the failed guardrail item (guardrail: true).\nconst cfg = $('CONFIG').first().json;\nconst t = $('PROFILE READY').first().json;\nconst nw = $('NORMALIZE NEWS').first().json;\nconst SYSTEM_RAW = \"You write LinkedIn posts for one person, published on their personal profile, in the first person. The reader is the author's professional network: engineers, hiring managers, recruiters and former colleagues.\\n\\nYou receive one JSON object with:\\n- author: facts about the person posting, as key/value pairs from their profile (name, headline, skills, what they are looking for, projects). For a personal post this is the full profile; for a general post only name and headline. Treat it as true and reuse its wording.\\n- topic: { title, category, scope, angle }. title is what the post is about. scope is \\\"personal\\\" (the post is about the author: use author facts, there is no news) or \\\"general\\\" (a topic from the outside world: use the news). angle is the author's own notes: facts they want in, the point they want to make, things to avoid. Follow it.\\n- news: zero or more recent web results about the topic (title, source, date, snippet).\\n- has_news: false when news is empty.\\n- today: today's date, ISO format.\\n\\nWhat each category needs:\\n- job_search: the author is looking for a role. Say clearly what they do, what they are looking for, and one concrete ask (a referral, an intro, a message). Confident and specific, never apologetic. Do not mention former employers unless angle names them.\\n- project: a short build log of something the author made. Lead with the problem, then what was built, then one thing learned.\\n- fun_fact / dev_stat: one fact or figure about software, tech or work. The fact must come from news or from angle. If neither contains a concrete fact, write a shorter post that asks the network a question about the topic instead, and add a warning.\\n- opinion: one clear take on the topic with one reason. No strawmen.\\n- other: follow angle.\\n\\nStructure: 3 to 5 short paragraphs of 1 to 3 sentences each, in this order:\\n1. Hook: one line that makes a reader stop scrolling. Never \\\"I'm excited to share\\\" or \\\"I'm thrilled\\\".\\n2. Substance: the news facts, the project, the fact, or the take.\\n3. Why it matters to the reader: one or two sentences.\\n4. Close: a question to the network or a concrete ask. For job_search, the ask.\\n\\nStyle rules:\\n- 60 to 150 words. Plain text, one blank line between paragraphs (\\\\n\\\\n), no markdown, no bullets, no headers.\\n- First person. Short declarative sentences. Concrete, no fluff, no corporate words (thrilled, leverage, synergy, game-changer, journey).\\n- At most one emoji in the whole post. No exclamation marks. No em-dashes.\\n- Hashtags: at most MAX_HASHTAGS, only on the final line, only if they fit the topic. Zero is fine.\\n- Never write anything a recruiter could read as a complaint about a former employer or an interview.\\n\\nFact rules, the most important part:\\n- Use only facts present in the input (author, topic.angle, news). No statistics, quotes, company facts, dates or names from your own knowledge. If you are not sure a fact is in the input, leave it out.\\n- Every number in the post must appear in author, in topic, in a news item, or in today. A deterministic checker rejects posts with any other number.\\n- Name a publication, company or person only if it appears in a news item (source, title or snippet) or in angle or author.\\n- If has_news is false, do not cite or imply any source. Write from angle and author only.\\n- Vague filler such as \\\"the industry is changing fast\\\" is not a fact. Leave it out.\\n\\nReturn JSON only, with exactly these keys:\\n{\\n  \\\"post_text\\\": \\\"<the post, with \\\\n between paragraphs>\\\",\\n  \\\"hook\\\": \\\"<the first line, exactly as it appears in post_text>\\\",\\n  \\\"facts_used\\\": [\\\"<each number or claim used> <- <author | angle | news:<source> | today>\\\"],\\n  \\\"warnings\\\": [\\\"<anything the reviewer should know: no usable news, a fact that was missing from the input, a claim you were unsure about>\\\"]\\n}\";\nconst SYSTEM = SYSTEM_RAW.replace(/MAX_HASHTAGS/g, String(cfg.MAX_HASHTAGS ?? 3));\nconst prev = $input.first().json || {};\nconst isRetry = prev.guardrail === true;\nconst attempt = isRetry ? Number(prev.attempt || 1) + 1 : 1;\nconst temperature = isRetry ? Number(cfg.LLM_RETRY_TEMPERATURE ?? 0.2) : Number(cfg.LLM_TEMPERATURE ?? 0.6);\nconst news = (nw.news_items || []).map(n => ({ title: n.title, source: n.source, date: n.date, snippet: String(n.snippet || '').slice(0, 400) }));\nconst payload = { author: t.author || {}, topic: { title: t.topic, category: t.category, scope: t.scope, angle: t.angle }, news, has_news: news.length > 0, today: DateTime.now().setZone(cfg.TIMEZONE || 'UTC').toISODate() };\nlet user = 'Write the post for this input:\\n' + JSON.stringify(payload, null, 2);\nif (isRetry && Array.isArray(prev.offending) && prev.offending.length) {\n  const why = { unverified_source: 'named sources or companies that are not in the input', too_many_hashtags: 'used too many hashtags' }[prev.reason] || 'used figures not present in the input';\n  user += '\\n\\nYour previous draft ' + why + ': ' + prev.offending.join(', ') + '. Do not use them. Rewrite the post using only facts from the input.';\n}\nelse if (isRetry && prev.reason === 'too_long') user += '\\n\\nYour previous draft was too long (' + (prev.error_message || '') + '). Rewrite it in at most 110 words.';\nelse if (isRetry) user += '\\n\\nYour previous answer was not valid JSON or failed. Return the JSON object only.';\nconst primary = String(cfg.LLM_PRIMARY || 'groq'), fallback = String(cfg.LLM_FALLBACK || 'gemini');\nlet provider = primary;\nif (isRetry) { const prevProv = prev.provider || primary; provider = (prev.reason === 'llm_error') ? (prevProv === primary ? fallback : primary) : prevProv; }\nconst gemini_body = {\n  system_instruction: { parts: [{ text: SYSTEM }] },\n  contents: [{ role: 'user', parts: [{ text: user }] }],\n  generationConfig: { temperature, maxOutputTokens: 4096, responseMimeType: 'application/json',\n    responseSchema: { type: 'OBJECT', required: ['post_text','hook','facts_used','warnings'], properties: {\n      post_text: { type: 'STRING' }, hook: { type: 'STRING' }, facts_used: { type: 'ARRAY', items: { type: 'STRING' } }, warnings: { type: 'ARRAY', items: { type: 'STRING' } } } } }\n};\nconst groqModel = String(cfg.GROQ_MODEL || 'openai/gpt-oss-120b');\nconst groq_body = { model: groqModel, temperature, max_tokens: 4096, response_format: { type: 'json_object' },\n  messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: user + '\\n\\nReturn the JSON object only.' }] };\nif (groqModel.includes('gpt-oss')) groq_body.reasoning_effort = 'low';\nconst request_body = provider === 'groq' ? groq_body : gemini_body;\nconst url = provider === 'groq' ? String(cfg.GROQ_API_URL) : `${cfg.GEMINI_API_BASE}/${cfg.GEMINI_MODEL}:generateContent`;\nreturn [{ json: { attempt, provider, temperature, request_body, url, record_id: t.id } }];\n"
+      },
+      "id": "b63dc749-7439-4423-969e-9aaa40c0b87e",
+      "name": "BUILD PROMPT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5040,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f28d3306-2e94-4d2f-8481-306c25e7adc6",
+              "leftValue": "={{ $json.provider === 'gemini' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "15578c24-4b67-4549-a69b-8affa029cd9c",
+      "name": "IF PROVIDER GEMINI",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "18ae5fc0-7518-488a-a877-084bb9259847",
+      "name": "GEMINI GENERATE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5520,
+        -180
+      ],
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "800e444f-9b7d-4321-8f5f-eb573d296eaa",
+      "name": "GROQ GENERATE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5520,
+        180
+      ],
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// PARSE + FACT GUARDRAIL\n// 1) Parse the model's JSON. 2) Deterministic checks: length, numbers, named outlets, hashtags. See prompts/guardrail-logic.md.\nconst cfg = $('CONFIG').first().json;\nconst bp = $('BUILD PROMPT').first().json;\nconst t = $('PROFILE READY').first().json;\nconst nw = $('NORMALIZE NEWS').first().json;\nconst resp = $input.first().json || {};\nconst TZ = cfg.TIMEZONE || 'UTC';\nconst MAX_TAGS = Number(cfg.MAX_HASHTAGS ?? 3);\nconst base = { guardrail: true, attempt: bp.attempt, provider: bp.provider, record_id: bp.record_id };\nconst fail = (reason, extra = {}) => [{ json: { ...base, ok: false, reason, offending: [], ...extra } }];\nif (resp.error) return fail('llm_error', { error_message: `llm_error (${bp.provider}): ` + (typeof resp.error === 'string' ? resp.error : (resp.error.message || JSON.stringify(resp.error))).slice(0, 300) });\nconst text = bp.provider === 'groq' ? (resp?.choices?.[0]?.message?.content || '') : (resp?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '');\nlet out;\ntry { out = JSON.parse(text); } catch (e) { return fail('llm_error', { error_message: 'llm_error: model did not return valid JSON', raw: text.slice(0, 500) }); }\nlet post = String(out.post_text || '').trim();\nif (!post) return fail('llm_error', { error_message: 'llm_error: empty post_text' });\nconst signature = String(cfg.POST_SIGNATURE || '').trim();\nif (signature && !post.includes(signature)) post = post.replace(/\\s*$/, '') + '\\n\\n' + signature;\nconst maxChars = Number(cfg.POST_MAX_CHARS || 1300);\nif (post.length > maxChars) return fail('too_long', { error_message: `too_long: ${post.length} > ${maxChars}`, post_text: post });\nconst SRC = { author_text: t.author_text || '', topic: t.topic, angle: t.angle, news_items: nw.news_items || [], signature };\n\n// ---- shared guardrail core: numbers, outlets, hashtags, signature ----\nconst TOKEN_RE = /(?<![A-Za-z\\d])\\d[\\d,.]*(?:\\s?(?:[KkMmBb](?![A-Za-z])|thousand|million|billion))?\\+?/gi;\nconst norm = (tok) => { let t = String(tok).trim().replace(/[#,+]/g, '').replace(/[.,]$/, ''); const m = t.match(/^(\\d+(?:\\.\\d+)?)\\s?(k|m|b|thousand|million|billion)?$/i); if (!m) return null; const suf = (m[2] || '').toLowerCase(); const mult = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, b: 1e9, billion: 1e9 }[suf] || 1; return Math.round(parseFloat(m[1]) * mult * 1000) / 1000; };\nconst allowed = new Set(); const addNum = (v) => { const n = norm(v); if (n !== null) allowed.add(n); };\nconst addText = (s) => { for (const m of String(s || '').matchAll(TOKEN_RE)) { addNum(m[0]); const plain = m[0].replace(/[,+]/g, '').trim(); const lead = plain.match(/^\\d+(?:\\.\\d+)?/); if (lead) { addNum(lead[0]); if (lead[0].includes('.')) addNum(lead[0].split('.')[0]); } } };\nconst today = DateTime.now().setZone(TZ);\n[today.year, today.month, today.day].forEach(addNum); addText(today.toISODate());\naddText(SRC.author_text); addText(SRC.topic); addText(SRC.angle);\n(SRC.news_items || []).forEach(n => { addText(n.title); addText(n.snippet); addText(n.date); });\nconst SIG = String(SRC.signature || '').trim();\nlet body = SIG ? post.replace(SIG, '') : post;\nconst offending = [];\nfor (const m of body.matchAll(TOKEN_RE)) { const tok = m[0].trim().replace(/[.,]$/, ''); const n = norm(tok); if (n !== null && !allowed.has(n)) offending.push(tok); }\nif (offending.length) return fail('fact_check', { offending: [...new Set(offending)], error_message: 'fact_check: ' + [...new Set(offending)].join(', '), post_text: post });\nconst OUTLETS = ['techcrunch','the verge','wired','ars technica','reuters','bloomberg','forbes','bbc','cnn','the guardian','new york times','nytimes','wall street journal','wsj','financial times','business insider','axios','hacker news','stack overflow','github','gartner','mckinsey','harvard business review','hbr','linkedin news','the information','venturebeat'];\nconst hay = ((SRC.news_items || []).map(n => `${n.source || ''} ${n.title || ''} ${n.snippet || ''} ${n.url || ''}`).join(' ') + ' ' + SRC.author_text + ' ' + SRC.angle + ' ' + SRC.topic).toLowerCase();\nconst bodyLow = body.toLowerCase();\nconst badOutlets = OUTLETS.filter(o => new RegExp(`(^|[^a-z])${o.replace('.', '\\\\.')}([^a-z]|$)`).test(bodyLow) && !hay.includes(o));\nif (badOutlets.length) return fail('unverified_source', { offending: badOutlets, error_message: 'unverified_source: ' + badOutlets.join(', '), post_text: post });\nconst tags = body.match(/(^|\\s)#[\\p{L}\\d_]+/gu) || [];\nif (tags.length > MAX_TAGS) return fail('too_many_hashtags', { offending: tags.map(t => t.trim()), error_message: `too_many_hashtags: ${tags.length} > ${MAX_TAGS}`, post_text: post });\n\nconst warnings = Array.isArray(out.warnings) ? [...out.warnings] : [];\nif (nw.searched && !(nw.news_items || []).length && !warnings.some(w => /news/i.test(w))) warnings.push('General post, but no usable news came back from the search' + (nw.news_error ? ` (search error: ${nw.news_error})` : '') + '. The draft is written from the topic notes only.');\nif (t.is_personal && !t.author_rows) warnings.push('Personal post, but the profile table has no active rows. The model only had the topic and angle.');\nif (t.scope_source === 'fallback') warnings.push(`Scope \"${t.scope}\" was decided by the keyword fallback, not the classifier: ${t.classify_reason}`);\nreturn [{ json: { ...base, ok: true, reason: 'ok', post_text: post, hook: String(out.hook || '').slice(0, 200),\n  model: bp.provider === 'groq' ? cfg.GROQ_MODEL : cfg.GEMINI_MODEL,\n  facts_used: Array.isArray(out.facts_used) ? out.facts_used : [], warnings,\n  word_count: body.trim().split(/\\s+/).length, hashtags: tags.length } }];\n"
+      },
+      "id": "5b59e0ba-aa3b-45a7-b8ea-a5a25dd8dde2",
+      "name": "PARSE + FACT GUARDRAIL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c60e42d0-42c8-4b0f-8e3c-a59f96e42d2f",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "2621cb26-a0d0-4157-a6f5-eb86bfba1758",
+      "name": "IF DRAFT OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "update",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.record_id }}",
+            "draft_text": "={{ $json.post_text }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "draft_text",
+              "displayName": "draft_text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "2e40f6c6-9ce5-40c1-8255-d6660abdc3a0",
+      "name": "SAVE DRAFT",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        6240,
+        0
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// BUILD SLACK MESSAGE (Block Kit)\n// Buttons carry the Airtable record id in `value`; action_id = approve | reject | edit. Workflow B handles the click.\nconst t = $('PROFILE READY').first().json;\nconst draft = $('PARSE + FACT GUARDRAIL').first().json;\nconst nw = $('NORMALIZE NEWS').first().json;\nconst esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst value = JSON.stringify({ r: t.id });\nconst newsLine = nw.searched ? `news: ${nw.news_count} item${nw.news_count === 1 ? '' : 's'}` : 'news: not searched (personal)';\n/** @type {any[]} */\nconst blocks = [\n  { type: 'header', text: { type: 'plain_text', text: `Post approval: ${t.topic}`.slice(0, 150), emoji: true } },\n  { type: 'context', elements: [{ type: 'mrkdwn', text:\n    `*${esc(t.scope)}* (scope by ${esc(t.scope_source)}) · ${esc(t.category)} · ${newsLine} · profile facts: ${t.author_rows}\\n` +\n    `model: ${esc(draft.model)} (attempt ${draft.attempt}) · ${draft.word_count} words · stack left: ${Math.max(0, (t.stack_size || 1) - 1)}` }] },\n  { type: 'section', text: { type: 'mrkdwn', text: esc(draft.post_text).slice(0, 2900) } },\n];\nif (Array.isArray(draft.warnings) && draft.warnings.length) blocks.push({ type: 'section', text: { type: 'mrkdwn', text: ':warning: *Review notes*\\n' + draft.warnings.map(w => '• ' + esc(w)).join('\\n') } });\nif (Array.isArray(draft.facts_used) && draft.facts_used.length) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: ('*Facts used:* ' + draft.facts_used.map(esc).join(' · ')).slice(0, 2900) }] });\nif (nw.news_items && nw.news_items.length) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: ('*Sources:* ' + nw.news_items.map(n => `<${n.url}|${esc(n.source)}>`).join(' · ')).slice(0, 2900) }] });\nblocks.push({ type: 'divider' });\nblocks.push({ type: 'actions', block_id: 'post_approval', elements: [\n  { type: 'button', action_id: 'approve', style: 'primary', text: { type: 'plain_text', text: 'Approve & publish', emoji: true }, value },\n  { type: 'button', action_id: 'reject', style: 'danger', text: { type: 'plain_text', text: 'Reject', emoji: true }, value,\n    confirm: { title: { type: 'plain_text', text: 'Reject this post?' }, text: { type: 'mrkdwn', text: 'The topic will be marked *rejected* and nothing is published. Set it back to queued to retry.' }, confirm: { type: 'plain_text', text: 'Reject' }, deny: { type: 'plain_text', text: 'Cancel' } } },\n  { type: 'button', action_id: 'edit', text: { type: 'plain_text', text: 'Edit…', emoji: true }, value },\n]});\nreturn [{ json: { record_id: t.id, blocks_json: JSON.stringify({ blocks }), fallback_text: `Post approval needed: ${t.topic}` } }];\n"
+      },
+      "id": "453463b4-5c5d-4ce4-a6b2-13f1e723aa94",
+      "name": "BUILD SLACK MESSAGE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('CONFIG').first().json.SLACK_APPROVALS_CHANNEL }}",
+          "mode": "id"
+        },
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        },
+        "messageType": "block",
+        "blocksUi": "={{ $json.blocks_json }}"
+      },
+      "id": "5919d297-827b-4564-98c2-d910107fe676",
+      "name": "SLACK: SEND FOR APPROVAL",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        6720,
+        0
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "update",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('BUILD SLACK MESSAGE').first().json.record_id }}",
+            "status": "pending_approval",
+            "slack_message_ts": "={{ String($json.ts ?? $json.message_timestamp ?? $json.message?.ts ?? $json.message_ts ?? '') }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "slack_message_ts",
+              "displayName": "slack_message_ts",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "b6406514-a15f-44a8-90c3-5cfe13b51e5d",
+      "name": "SET pending_approval + slack ts",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        6960,
+        0
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "7aebd6fd-c8b3-42d2-acfc-ae82ffc1c3ab",
+      "name": "Topic handed to reviewer",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        7200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "663f231e-5265-4e63-9c9e-2420938f14a9",
+              "leftValue": "={{ $json.attempt < Number($('CONFIG').first().json.LLM_MAX_ATTEMPTS || 3) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "618cf3e5-e343-45ef-aba2-4bf96c941969",
+      "name": "IF RETRY LEFT",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6240,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "base": {
+          "__rl": true,
+          "value": "appREPLACE_ME",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblTOPICS_REPLACE_ME",
+          "mode": "id"
+        },
+        "operation": "update",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.record_id }}",
+            "status": "failed",
+            "error_message": "={{ $json.error_message }}",
+            "draft_text": "={{ $json.post_text || '' }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "error_message",
+              "displayName": "error_message",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "draft_text",
+              "displayName": "draft_text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ]
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "868357f5-25de-47a9-84eb-1997f9d57dac",
+      "name": "Mark FAILED",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        6480,
+        540
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('CONFIG').first().json.SLACK_ALERTS_CHANNEL }}",
+          "mode": "id"
+        },
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        },
+        "text": "=:rotating_light: *{{ $('TOPIC READY').first().json.topic }}* could not be drafted.\n*Reason:* {{ $json.fields?.error_message ?? $json.error_message ?? '' }}\n*Status:* failed · execution {{ $execution.id }} · set the row back to queued to retry."
+      },
+      "id": "c9649737-8f94-49cd-a476-2750677c94d2",
+      "name": "SLACK: ALERT FAILURE",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        6720,
+        540
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "content": "## 1. Pop one topic\nRuns Mon/Wed/Fri 09:00 (UTC) or manually. `SEARCH STACK` reads every `queued` row plus `processing` rows whose claim is older than `STALE_CLAIM_HOURS` (crash safety net). `POP TOP` sorts pinned first, then newest `created_at`, and keeps **one**. Empty stack = quiet run, no alert.\n\n**Claim guard:** write `execution_id` + `claimed_at`, wait, read back, continue only if our id is still there. Airtable has no compare-and-swap; the schedule makes overlap impossible by construction, this is defence in depth.",
+        "height": 220,
+        "width": 760,
+        "color": 1
+      },
+      "id": "065e6a2f-f1f3-4bec-b1e6-517d1f136a57",
+      "name": "Note stack",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Personal or general?\nIf the row already has `scope`, it is used as is. Otherwise `CLASSIFY REQUEST` → `GROQ CLASSIFY` (temperature 0, JSON) decides `scope` and fills `category` if empty. If the call fails, `PARSE CLASSIFICATION` falls back to a keyword rule and the Slack message says so. `SAVE SCOPE` writes the decision to the row so you can see and correct it.",
+        "height": 180,
+        "width": 760,
+        "color": 4
+      },
+      "id": "c9a289b0-4b50-498f-afb4-a42e9f73f3d3",
+      "name": "Note classify",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Sources\n`PROFILE LOOKUP` reads the `profile` table (active rows). **Personal** post: all rows become `author`. **General** post: only `use_for = always` rows (name, headline), then `TAVILY NEWS SEARCH` runs on `news_query` (or the topic). `NORMALIZE NEWS` keeps results with score ≥ `NEWS_MIN_SCORE` that mention the query; a Tavily failure never stops the run.",
+        "height": 180,
+        "width": 760,
+        "color": 5
+      },
+      "id": "a1e44456-c4d9-4e51-b97c-1b32b46863d7",
+      "name": "Note sources",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Draft + guardrail\n`BUILD PROMPT` = system prompt (prompts/post-generation-system-prompt.md) + JSON input (author, topic, news, today). Primary `GROQ GENERATE`, failover `GEMINI GENERATE` on an llm_error. `PARSE + FACT GUARDRAIL`: length, every number must exist in author/topic/angle/news/today, named outlets must be in the sources, hashtag cap. Fail → retry at low temperature with the offending items named, up to `LLM_MAX_ATTEMPTS`, then `failed` + alert.",
+        "height": 200,
+        "width": 760,
+        "color": 6
+      },
+      "id": "a72bccec-1634-4863-be5b-7e9150920115",
+      "name": "Note draft",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        5040,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5. Human approval in Slack (end of A)\nBlock Kit message: scope, category, news count, profile facts, model, the draft, review notes, facts used, source links, and **Approve / Reject / Edit** buttons carrying the record id. Row → `pending_approval` with `slack_message_ts`.\n\nNo Wait node: A ends here. Clicks arrive at Workflow B. State lives in Airtable, so a decision days later is fine.",
+        "height": 200,
+        "width": 760,
+        "color": 3
+      },
+      "id": "60896cf1-5d94-41af-93c2-98d6e0ed8368",
+      "name": "Note approval",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        6480,
+        -360
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Mon/Wed/Fri 09:00": {
+      "main": [
+        [
+          {
+            "node": "CONFIG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "CONFIG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONFIG": {
+      "main": [
+        [
+          {
+            "node": "SEARCH STACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SEARCH STACK": {
+      "main": [
+        [
+          {
+            "node": "POP TOP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POP TOP": {
+      "main": [
+        [
+          {
+            "node": "IF STACK NOT EMPTY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF STACK NOT EMPTY": {
+      "main": [
+        [
+          {
+            "node": "CLAIM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stack empty, nothing to do",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLAIM": {
+      "main": [
+        [
+          {
+            "node": "CLAIM SETTLE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLAIM SETTLE": {
+      "main": [
+        [
+          {
+            "node": "READ-BACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "READ-BACK": {
+      "main": [
+        [
+          {
+            "node": "IF CLAIM WON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF CLAIM WON": {
+      "main": [
+        [
+          {
+            "node": "IF SCOPE SET",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lost claim, stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF SCOPE SET": {
+      "main": [
+        [
+          {
+            "node": "TOPIC READY",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CLASSIFY REQUEST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CLASSIFY REQUEST": {
+      "main": [
+        [
+          {
+            "node": "GROQ CLASSIFY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GROQ CLASSIFY": {
+      "main": [
+        [
+          {
+            "node": "PARSE CLASSIFICATION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE CLASSIFICATION": {
+      "main": [
+        [
+          {
+            "node": "TOPIC READY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TOPIC READY": {
+      "main": [
+        [
+          {
+            "node": "SAVE SCOPE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAVE SCOPE": {
+      "main": [
+        [
+          {
+            "node": "PROFILE LOOKUP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROFILE LOOKUP": {
+      "main": [
+        [
+          {
+            "node": "PROFILE READY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PROFILE READY": {
+      "main": [
+        [
+          {
+            "node": "IF GENERAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF GENERAL": {
+      "main": [
+        [
+          {
+            "node": "TAVILY NEWS SEARCH",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "NORMALIZE NEWS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TAVILY NEWS SEARCH": {
+      "main": [
+        [
+          {
+            "node": "NORMALIZE NEWS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NORMALIZE NEWS": {
+      "main": [
+        [
+          {
+            "node": "SAVE NEWS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAVE NEWS": {
+      "main": [
+        [
+          {
+            "node": "BUILD PROMPT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUILD PROMPT": {
+      "main": [
+        [
+          {
+            "node": "IF PROVIDER GEMINI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF PROVIDER GEMINI": {
+      "main": [
+        [
+          {
+            "node": "GEMINI GENERATE",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GROQ GENERATE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GEMINI GENERATE": {
+      "main": [
+        [
+          {
+            "node": "PARSE + FACT GUARDRAIL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GROQ GENERATE": {
+      "main": [
+        [
+          {
+            "node": "PARSE + FACT GUARDRAIL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE + FACT GUARDRAIL": {
+      "main": [
+        [
+          {
+            "node": "IF DRAFT OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF DRAFT OK": {
+      "main": [
+        [
+          {
+            "node": "SAVE DRAFT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF RETRY LEFT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAVE DRAFT": {
+      "main": [
+        [
+          {
+            "node": "BUILD SLACK MESSAGE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUILD SLACK MESSAGE": {
+      "main": [
+        [
+          {
+            "node": "SLACK: SEND FOR APPROVAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SLACK: SEND FOR APPROVAL": {
+      "main": [
+        [
+          {
+            "node": "SET pending_approval + slack ts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SET pending_approval + slack ts": {
+      "main": [
+        [
+          {
+            "node": "Topic handed to reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF RETRY LEFT": {
+      "main": [
+        [
+          {
+            "node": "BUILD PROMPT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark FAILED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark FAILED": {
+      "main": [
+        [
+          {
+            "node": "SLACK: ALERT FAILURE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "tags": []
+}

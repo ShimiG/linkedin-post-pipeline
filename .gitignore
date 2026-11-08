@@ -1,0 +1,11 @@
+# Never commit secrets or localized exports
+.env
+*.env
+**/secrets*
+**/*token*
+**/*apikey*
+workflows/raw/
+# OS noise
+.DS_Store
+# Local-only material, not part of this repo
+archive/

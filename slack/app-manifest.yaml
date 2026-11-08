@@ -1,0 +1,18 @@
+# Slack app manifest (api.slack.com > Create app > From manifest). Fill request_url with Workflow B's production webhook URL.
+display_information:
+  name: Post Approvals
+features:
+  bot_user:
+    display_name: post-approvals
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - chat:write.public
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: "[Workflow B production webhook URL, path /webhook/slack-interactions]"
+  org_deploy_enabled: false
+  socket_mode_enabled: false
