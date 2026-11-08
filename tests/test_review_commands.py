@@ -100,3 +100,46 @@ def test_rewrite_updates_only_the_post(board, monkeypatch):
     new_body = upd[2]["body"]
     assert gh.parse_parts(new_body) == ("גרסה חדשה.", "New version.") and gh.parse_meta(new_body) == gh.parse_meta(i["body"])
     assert seen["current"] == "Post body."  # the English is what gets rewritten
+
+
+LIVE = {**CFG, "publish_mode": "linkedin"}
+
+
+def live_with(mode):
+    return {**LIVE, "post": {"source_link": mode}}
+
+
+def test_manual_mode_never_calls_comment_api_and_reminds(board, monkeypatch):
+    sent = {}
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc: sent.update(fc=fc) or ("urn:li:share:1", "https://li/1", None))
+    review.approve(live_with("manual"), issue())
+    assert sent["fc"] is None
+    msg = [e for e in board if e[0] == "comment"][0][1][1]
+    assert "Add the source as the first comment" in msg and "Source: https://ex.com/a" in msg and "https://li/1" in msg
+
+
+def test_auto_mode_falls_back_to_reminder_on_403(board, monkeypatch):
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc: ("urn:li:share:1", "https://li/1", "LinkedIn refused (403)"))
+    review.approve(live_with("auto"), issue())
+    msg = [e for e in board if e[0] == "comment"][0][1][1]
+    assert "could not add it" in msg and "Source: https://ex.com/a" in msg
+
+
+def test_auto_mode_success_needs_no_reminder(board, monkeypatch):
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc: ("urn:li:share:1", "https://li/1", None))
+    review.approve(live_with("auto"), issue())
+    assert "first comment" not in [e for e in board if e[0] == "comment"][0][1][1]
+
+
+def test_off_mode(board, monkeypatch):
+    sent = {}
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc: sent.update(fc=fc) or ("urn:li:share:1", "https://li/1", None))
+    review.approve(live_with("off"), issue())
+    assert sent["fc"] is None and "first comment" not in [e for e in board if e[0] == "comment"][0][1][1]
+
+
+def test_source_link_mode_defaults_and_legacy_key():
+    assert review.source_link_mode({"post": {}}) == "manual"
+    assert review.source_link_mode({"post": {"source_link_as_comment": True}}) == "auto"
+    assert review.source_link_mode({"post": {"source_link_as_comment": False}}) == "off"
+    assert review.source_link_mode({"post": {"source_link": "MANUAL"}}) == "manual"

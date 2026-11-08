@@ -14,7 +14,8 @@ schedule Mon/Wed/Fri ──▶ draft job
                            └─ opens a `draft` issue  ──▶ you get a GitHub notification
 
 you comment on the issue ──▶ review job
-                           ├─ /approve          → one LinkedIn post (headline, *English below, Hebrew, • • •, English) + source link as the first comment
+                           ├─ /approve          → one LinkedIn post (headline, *English below, Hebrew, • • •, English);
+                           │                       the issue then gives you the source link to paste as the first comment
                            ├─ /reject           → closed; that story/article may come back after a 7-day cooldown
                            ├─ /block [site]     → closed; that story/article (or the whole website) is never used again
                            └─ /rewrite <ask>    → English rewritten and re-checked, translated again, issue updated
@@ -68,6 +69,9 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest -q
 DRY_RUN=1 GROQ_API_KEY=... .venv/bin/python -m poster.draft   # prints the issue instead of opening it
 ```
+
+## The source link
+Links inside a post cut its reach, so the source goes in the first comment. LinkedIn only lets partner apps comment through the API (self-serve apps get a 403), so by default (`post.source_link: manual`) the bot does not try: after `/approve` it comments on the issue with the post link and the line to paste. `auto` makes the bot comment itself if your app has LinkedIn's Community Management API; `off` drops the link.
 
 ## Costs and limits
 - GitHub Actions: each run takes about a minute; the free plan includes 2,000 minutes a month.
