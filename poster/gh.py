@@ -8,7 +8,10 @@ import urllib.parse
 from .http import HttpError, request
 
 API = "https://api.github.com"
-POST_START, POST_END = "<!-- post:start -->", "<!-- post:end -->"
+POST_START, POST_END = "<!-- post:start -->", "<!-- post:end -->"          # single-language drafts (older issues)
+HE_START, HE_END = "<!-- post-he:start -->", "<!-- post-he:end -->"       # translation, published first
+EN_START, EN_END = "<!-- post-en:start -->", "<!-- post-en:end -->"
+SECTION_START, SECTION_END = "<!-- post-section:start -->", "<!-- post-section:end -->"  # wraps the blocks + headings
 META_RE = re.compile(r"<!-- meta: (\{.*?\}) -->", re.S)
 LABELS = {
     "draft": ("0e8a16", "A post draft waiting for /approve, /reject or /rewrite"),
@@ -105,21 +108,41 @@ def parse_meta(body):
         return {}
 
 
-def parse_post(body):
+def _between(body, start, end):
+    if start not in body or end not in body:
+        return None
+    return body.split(start, 1)[1].split(end, 1)[0].strip().replace("\r\n", "\n")
+
+
+def parse_parts(body):
+    """(translation, english) from a draft issue. Older single-block issues return ("", text)."""
     body = body or ""
-    if POST_START not in body or POST_END not in body:
-        return ""
-    return body.split(POST_START, 1)[1].split(POST_END, 1)[0].strip().replace("\r\n", "\n")
+    en = _between(body, EN_START, EN_END)
+    if en is not None:
+        return _between(body, HE_START, HE_END) or "", en
+    return "", _between(body, POST_START, POST_END) or ""
+
+
+def post_section(he, en):
+    """The editable post area of an issue: Hebrew block (if any) then English block, wrapped so it can be swapped whole."""
+    if he:
+        inner = (f"**עברית** (posted first):\n\n{HE_START}\n{he}\n{HE_END}\n\n"
+                 f"**English** (posted second, after a separator line):\n\n{EN_START}\n{en}\n{EN_END}")
+    else:
+        inner = f"{EN_START}\n{en}\n{EN_END}"
+    return f"{SECTION_START}\n{inner}\n{SECTION_END}"
 
 
 def render_draft(topic, news_items, draft, extra_warnings=()):
     kind_label = {"news": "AI news", "fact": "Coding fact", "queued": "Your topic"}[topic["kind"]]
     src = topic.get("source_url")
-    head = [f"**{kind_label}**", f"model `{draft.model}` (attempt {draft.attempt})", f"{draft.words} words", f"{len(draft.post_text)} chars"]
+    head = [f"**{kind_label}**", f"model `{draft.model}` (attempt {draft.attempt})", f"{draft.words} words (English)"]
+    if draft.post_text_he:
+        head.append(f"translated by `{draft.translation_model}`")
     lines = [" · ".join(head), ""]
     if src:
         lines += [f"**Source:** [{topic['title']}]({src})" + (f" · [HN discussion]({topic['discussion_url']})" if topic.get("discussion_url") else ""), ""]
-    lines += ["The post (edit the text between the markers to change it by hand):", "", POST_START, draft.post_text, POST_END, ""]
+    lines += ["The post (edit the text between the markers to change it by hand):", "", post_section(draft.post_text_he, draft.post_text), ""]
     warnings = list(draft.warnings) + list(extra_warnings)
     if warnings:
         lines += ["> [!WARNING]", "> **Review notes**"] + [f"> - {w}" for w in warnings] + [""]
@@ -127,13 +150,18 @@ def render_draft(topic, news_items, draft, extra_warnings=()):
         lines += ["<details><summary>Facts used</summary>", ""] + [f"- {f}" for f in draft.facts_used] + ["", "</details>", ""]
     if src:
         lines += [f"**First comment** (posted under the post): Source: {src}", ""]
-    lines += ["---", "Reply with **`/approve`** to publish, **`/reject`** to drop it, or **`/rewrite <what to change>`** for an AI rewrite.", ""]
+    lines += ["---", "Reply with **`/approve`** to publish, **`/reject`** to drop it, or **`/rewrite <what to change>`** for an AI rewrite"
+              + (" (the English is rewritten, then translated again)." if draft.post_text_he else "."), ""]
     meta = {"kind": topic["kind"], "topic": topic, "news": news_items}
     lines.append(f"<!-- meta: {json.dumps(meta, ensure_ascii=False).replace('-->', '--&gt;')} -->")
     return "\n".join(lines)
 
 
-def replace_post(body, new_post):
-    a, rest = body.split(POST_START, 1)
-    _, b = rest.split(POST_END, 1)
-    return f"{a}{POST_START}\n{new_post}\n{POST_END}{b}"
+def replace_parts(body, he, en):
+    """Swap in new text, keeping everything else. Converts an older single-block issue to the new layout."""
+    for start, end in ((SECTION_START, SECTION_END), (POST_START, POST_END)):
+        if start in body and end in body:
+            a, rest = body.split(start, 1)
+            _, b = rest.split(end, 1)
+            return f"{a}{post_section(he, en)}{b}"
+    raise ValueError("no post markers in the issue body")

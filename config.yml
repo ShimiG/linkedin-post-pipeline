@@ -24,6 +24,13 @@ post:
   signature: ""                # optional fixed last line, appended if missing, excluded from checks
   source_link_as_comment: true # links in the post body cut reach, so the source goes in the first comment
 
+# Each post is written in English, translated, and published as one post: translation first, then the English.
+bilingual:
+  enabled: true
+  language: Hebrew             # the script check in guardrail.check_translation is Hebrew-specific
+  separator: "• • •"           # line between the two versions
+  max_total_chars: 3000        # LinkedIn's limit for the combined post
+
 news:
   lookback_days: 7
   min_points: 80               # Hacker News points, a cheap "is anyone talking about this" filter

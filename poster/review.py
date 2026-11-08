@@ -10,7 +10,7 @@ from .config import load_config, load_profile
 from .draft import author_for
 
 LINKEDIN_MAX = 3000
-HELP = "Commands: **`/approve`** publishes the text between the markers, **`/reject`** drops it, **`/rewrite <what to change>`** asks the AI for a new version."
+HELP = "Commands: **`/approve`** publishes the text between the markers (Hebrew first, then English), **`/reject`** drops it, **`/rewrite <what to change>`** asks the AI for a new version."
 
 
 def parse_command(text):
@@ -25,9 +25,10 @@ def approve(cfg, issue):
     n, labels = issue["number"], {l["name"] for l in issue.get("labels", [])}
     if "published" in labels:
         return gh.comment(n, "Already published, nothing to do.")
-    post = gh.parse_post(issue.get("body"))
+    he, en = gh.parse_parts(issue.get("body"))
+    post = compose.combine(cfg, he, en)
     if not post:
-        return gh.comment(n, ":x: I can't find the post. Keep the `<!-- post:start -->` and `<!-- post:end -->` markers around the text.")
+        return gh.comment(n, ":x: I can't find the post. Keep the `<!-- post-…:start -->` / `<!-- post-…:end -->` markers around the text.")
     if len(post) > LINKEDIN_MAX:
         return gh.comment(n, f":x: The post is {len(post)} characters; LinkedIn allows {LINKEDIN_MAX}. Shorten it and `/approve` again.")
     meta = gh.parse_meta(issue.get("body"))
@@ -62,18 +63,19 @@ def rewrite(cfg, issue, instruction):
     n = issue["number"]
     if not instruction:
         return gh.comment(n, "Tell me what to change, e.g. `/rewrite shorter, and end with a question about testing`.")
-    meta, current = gh.parse_meta(issue.get("body")), gh.parse_post(issue.get("body"))
+    meta, (_, current) = gh.parse_meta(issue.get("body")), gh.parse_parts(issue.get("body"))
     topic = meta.get("topic")
     if not topic or not current:
-        return gh.comment(n, ":x: This issue is missing its draft markers or hidden metadata, so I can't rewrite it.")
+        return gh.comment(n, ":x: This issue is missing its English draft or hidden metadata, so I can't rewrite it.")
     try:
         d = compose.write(cfg, author_for(cfg, load_profile(), topic["kind"]), topic, meta.get("news", []),
                           instruction=instruction, current=current)
     except RuntimeError as e:
         return gh.comment(n, f":x: Rewrite failed: {e}. The draft is unchanged.")
-    gh.update_issue(n, body=gh.replace_post(issue["body"], d.post_text))
+    gh.update_issue(n, body=gh.replace_parts(issue["body"], d.post_text_he, d.post_text))
     notes = "".join(f"\n- {w}" for w in d.warnings)
-    gh.comment(n, f"Rewritten ({d.words} words, `{d.model}`). The issue text above now holds the new version."
+    translated = " and translated" if d.post_text_he else ""
+    gh.comment(n, f"Rewritten{translated} ({d.words} words, `{d.model}`). The issue text above now holds the new version."
                + (f"\n\n**Review notes:**{notes}" if notes else "") + "\n\n" + HELP)
 
 

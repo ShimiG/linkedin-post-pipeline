@@ -4,16 +4,18 @@ import os
 
 from .http import HttpError, request
 
-GEMINI_SCHEMA = {"type": "OBJECT", "required": ["post_text", "hook", "facts_used", "warnings"], "properties": {
+POST_SCHEMA = {"type": "OBJECT", "required": ["post_text", "hook", "facts_used", "warnings"], "properties": {
     "post_text": {"type": "STRING"}, "hook": {"type": "STRING"},
     "facts_used": {"type": "ARRAY", "items": {"type": "STRING"}}, "warnings": {"type": "ARRAY", "items": {"type": "STRING"}}}}
+TRANSLATION_SCHEMA = {"type": "OBJECT", "required": ["post_text_he", "notes"], "properties": {
+    "post_text_he": {"type": "STRING"}, "notes": {"type": "ARRAY", "items": {"type": "STRING"}}}}
 
 
 class LLMError(Exception):
     pass
 
 
-def _groq(cfg, system, user, temperature):
+def _groq(cfg, system, user, temperature, schema):
     key = os.environ.get("GROQ_API_KEY")
     if not key:
         raise LLMError("GROQ_API_KEY is not set")
@@ -26,14 +28,14 @@ def _groq(cfg, system, user, temperature):
     return data["choices"][0]["message"]["content"], model
 
 
-def _gemini(cfg, system, user, temperature):
+def _gemini(cfg, system, user, temperature, schema):
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise LLMError("GEMINI_API_KEY is not set")
     model = cfg["llm"]["gemini_model"]
     body = {"system_instruction": {"parts": [{"text": system}]}, "contents": [{"role": "user", "parts": [{"text": user}]}],
             "generationConfig": {"temperature": temperature, "maxOutputTokens": 4096,
-                                 "responseMimeType": "application/json", "responseSchema": GEMINI_SCHEMA}}
+                                 "responseMimeType": "application/json", "responseSchema": schema}}
     url = f"{cfg['llm']['gemini_base']}/{model}:generateContent"
     _, _, data = request("POST", url, headers={"x-goog-api-key": key}, body=body, timeout=90)
     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
@@ -43,10 +45,10 @@ def _gemini(cfg, system, user, temperature):
 PROVIDERS = {"groq": _groq, "gemini": _gemini}
 
 
-def generate(cfg, provider, system, user, temperature):
+def generate(cfg, provider, system, user, temperature, schema=None):
     """Returns (parsed_json, model). Raises LLMError on any provider or parse failure."""
     try:
-        text, model = PROVIDERS[provider](cfg, system, user, temperature)
+        text, model = PROVIDERS[provider](cfg, system, user, temperature, schema or POST_SCHEMA)
     except (HttpError, OSError, KeyError, IndexError) as e:
         raise LLMError(f"{provider}: {e}") from None
     try:

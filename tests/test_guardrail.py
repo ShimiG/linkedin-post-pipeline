@@ -78,3 +78,30 @@ def test_retry_note_names_offenders():
 def test_suffix_glued_to_digit_is_not_billion():
     assert guardrail.norm("2026") == 2026
     assert [m.group(0) for m in guardrail.TOKEN_RE.finditer("In 2026, B2B")] == ["2026,"]
+
+
+EN_POST = "A model scored 48.1% after a 0.016% edit.\n\nWhat would you try?\n\n#AI #LLM"
+
+
+def test_translation_ok_with_english_terms():
+    he = "מודל קיבל 48.1% אחרי עריכה של 0.016% מהמשקלות של ה-LLM.\n\nמה הייתם מנסים?"
+    assert guardrail.check_translation(he, EN_POST, today=TODAY).ok
+
+
+def test_translation_new_number_fails():
+    r = guardrail.check_translation("מודל קיבל 48.1% ושיפור פי 3 אחרי עריכה של 0.016%.", EN_POST, today=TODAY)
+    assert not r.ok and r.reason == "fact_check" and r.offending == ["3"]
+
+
+def test_translation_not_hebrew_fails():
+    assert guardrail.check_translation("A model scored 48.1%.", EN_POST, today=TODAY).reason == "not_hebrew"
+
+
+def test_translation_hashtags_and_links_fail():
+    assert guardrail.check_translation("מודל חדש.\n\n#AI", EN_POST, today=TODAY).reason == "hashtags_in_translation"
+    assert guardrail.check_translation("מודל חדש https://x.com/a", EN_POST, today=TODAY).reason == "contains_url"
+
+
+def test_translation_retry_note():
+    r = guardrail.check_translation("שיפור פי 3.", EN_POST, today=TODAY)
+    assert "3" in guardrail.translation_retry_note(r)
