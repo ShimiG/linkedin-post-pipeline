@@ -1,0 +1,11 @@
+# Copy to profile.yml (gitignored), fill in, then upload as a repo secret:
+#   gh secret set PROFILE_YML < profile.yml
+# Free-form key: value pairs. News and fact posts only get the keys listed in config.yml
+# `general_post_profile_keys`; your own topics (issues labelled `topic`) get all of them.
+# Numbers here are allowed by the fact check, so keep them true.
+name: Your Name
+headline: What you do, as on your LinkedIn headline
+focus: the kind of work you want people to associate you with
+daily_tools: the tools you use every day
+years_experience: N+ years doing X
+side_project_example: one line about something you built

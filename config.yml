@@ -1,0 +1,122 @@
+# Pipeline settings. Secrets (API keys, LinkedIn token, your profile) are NOT here: they are GitHub repo secrets.
+# Repo variables override a few of these without a commit: PUBLISH_MODE, TIMEZONE.
+
+publish_mode: simulated        # simulated = /approve only shows what would be posted. Set to "linkedin" (or repo variable PUBLISH_MODE) to go live.
+timezone: UTC                  # used for "today" in prompts; override with repo variable TIMEZONE
+
+# Order the automatic post kinds rotate through when no `topic` issue is waiting.
+rotation: [news, fact]
+
+llm:
+  primary: groq
+  fallback: gemini
+  groq_model: openai/gpt-oss-120b
+  groq_url: https://api.groq.com/openai/v1/chat/completions
+  gemini_model: gemini-3.5-flash-lite
+  gemini_base: https://generativelanguage.googleapis.com/v1beta/models
+  temperature: 0.6
+  retry_temperature: 0.2
+  max_attempts: 3
+
+post:
+  max_chars: 1300              # LinkedIn allows 3000; short posts read better
+  max_hashtags: 3
+  signature: ""                # optional fixed last line, appended if missing, excluded from checks
+  source_link_as_comment: true # links in the post body cut reach, so the source goes in the first comment
+
+news:
+  lookback_days: 7
+  min_points: 80               # Hacker News points, a cheap "is anyone talking about this" filter
+  queries: [AI, LLM, OpenAI, Anthropic, Claude, Gemini, GPT, "machine learning", "AI agents", "open source model"]
+  max_candidates: 8            # stories tried, best first, until one has a readable article
+
+# Profile keys given to news and fact posts (your own topics get the whole profile).
+general_post_profile_keys: [name, headline, focus, daily_tools]
+
+linkedin:
+  token_warn_days: 10          # open a reminder issue this many days before LINKEDIN_TOKEN_EXPIRES
+
+# Wikipedia articles the "coding fact" posts are drawn from. Each is used once; add more any time.
+fact_subjects:
+  - Ada Lovelace
+  - Grace Hopper
+  - Margaret Hamilton (software engineer)
+  - Alan Turing
+  - Edsger W. Dijkstra
+  - Donald Knuth
+  - Dennis Ritchie
+  - Ken Thompson
+  - Linus Torvalds
+  - Tim Berners-Lee
+  - Fortran
+  - COBOL
+  - Lisp (programming language)
+  - C (programming language)
+  - Python (programming language)
+  - JavaScript
+  - Java (programming language)
+  - Rust (programming language)
+  - Go (programming language)
+  - TypeScript
+  - SQL
+  - Unix
+  - Linux kernel
+  - Git
+  - Vim (text editor)
+  - Emacs
+  - Regular expression
+  - UTF-8
+  - ASCII
+  - Unix time
+  - Year 2038 problem
+  - Year 2000 problem
+  - Floating-point arithmetic
+  - Bloom filter
+  - Quicksort
+  - Binary search
+  - Hash table
+  - Dijkstra's algorithm
+  - Big O notation
+  - Garbage collection (computer science)
+  - Rubber duck debugging
+  - Software bug
+  - Debugging
+  - Unit testing
+  - Test-driven development
+  - Agile software development
+  - Conway's law
+  - Brooks's law
+  - Hofstadter's law
+  - Murphy's law
+  - Technical debt
+  - Open-source software
+  - Hello, World! program
+  - Stack Overflow
+  - JSON
+  - HTTP
+  - REST
+  - WebSocket
+  - Domain Name System
+  - Transmission Control Protocol
+  - Public-key cryptography
+  - SQL injection
+  - Cross-site scripting
+  - Docker (software)
+  - Kubernetes
+  - Turing test
+  - ELIZA
+  - Perceptron
+  - Backpropagation
+  - Transformer (deep learning architecture)
+  - Large language model
+  - Retrieval-augmented generation
+  - Reinforcement learning from human feedback
+  - Prompt engineering
+  - Hallucination (artificial intelligence)
+  - AlphaGo
+  - Deep Blue (chess computer)
+  - Moore's law
+  - Mechanical Turk
+  - Difference engine
+  - ENIAC
+  - Apollo Guidance Computer

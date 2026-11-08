@@ -1,50 +1,72 @@
-# LinkedIn post pipeline (n8n)
+# LinkedIn post pipeline (GitHub Actions)
 
-A topic stack in Airtable feeds an n8n pipeline that drafts one LinkedIn post per run, checks it, and sends it to Slack for a human to approve, reject or edit. Approved posts are published to a personal LinkedIn profile (or simulated).
+Drafts a LinkedIn post three times a week from free sources, fact-checks it, and opens a GitHub issue for you to approve. Comment `/approve` and it is published on your personal profile. No server, no database, no paid services.
 
 ```
-Airtable topics (stack)  ──pop one──▶  A: classify ─▶ sources ─▶ draft ─▶ guardrail ─▶ Slack approval
-                                           │ personal: profile table        │
-                                           │ general:  Tavily news          ▼
-Airtable status board    ◀──────────────  B: approve / reject / edit / AI rewrite ─▶ LinkedIn (or simulated)
-                                           C: reminders · D: error handler
+schedule Mon/Wed/Fri ──▶ draft job
+                           ├─ your queued `topic` issue, if any, else alternate:
+                           │    AI news   ← Hacker News (top AI story this week) + the article text
+                           │    coding fact ← a Wikipedia article from config.yml
+                           ├─ Groq writes the post in your voice (Gemini as fallback)
+                           ├─ guardrail: every number and outlet must be in the sources, no links, ≤ 3 hashtags
+                           └─ opens a `draft` issue  ──▶ you get a GitHub notification
+
+you comment on the issue ──▶ review job
+                           ├─ /approve          → LinkedIn post + source link as the first comment, issue closed
+                           ├─ /reject           → closed, that source is never reused
+                           └─ /rewrite <ask>    → AI rewrite, re-checked, issue text updated
 ```
 
-## How a post happens
-1. You add a row to the `topics` table: a title, optional notes (`angle`), optional category. That is a push.
-2. Mon/Wed/Fri at 09:00 (or on a manual run) Workflow A pops the top of the stack: the newest `queued` row, or a `pinned` one.
-3. A decides whether the post is **about you** (`personal`) or **about the world** (`general`). You can set `scope` on the row to skip the classifier.
-   - personal → loads your facts from the `profile` table, no news search.
-   - general → Tavily news search on the topic, plus your name and headline from `profile`.
-4. The model (Groq, Gemini failover) writes the post in your voice. A deterministic guardrail rejects any number, outlet or hashtag count that is not backed by the sources, and retries with the problem named.
-5. Slack gets the draft with scope, sources, review notes and **Approve / Reject / Edit** buttons.
-6. Workflow B handles the click: status gate, claim with read-back, publish (simulated by default, LinkedIn node when `PUBLISH_MODE=linkedin`), message updated in place.
-7. Nothing waits inside n8n. State lives in Airtable, so you can approve three days later.
+The issues are the whole system of record: what was drafted, which sources were used, what was published. Nothing is committed by the bot.
 
-## Where things live
-| Folder | Purpose |
-|---|---|
-| `workflows/` | Generated n8n exports (sanitized). `raw/` holds your localized copies (gitignored) |
-| `scripts/` | `build_workflows.py` (generator), `localize.py` (your ids in) |
-| `prompts/` | System prompt, classifier prompt, guardrail spec, rewrite prompt |
-| `data/` | `topics` + `profile` table schemas, Tavily search spec |
-| `slack/` | Slack app manifest |
+## Using it
+- **Approve from your phone:** the GitHub mobile app notifies you about the new issue; reply `/approve`.
+- **Edit by hand:** edit the issue and change the text between `<!-- post:start -->` and `<!-- post:end -->`, then `/approve`. What you approve is exactly what is posted.
+- **Queue your own topic:** open an issue with the label `topic`. The title is the subject, the body is your notes (facts, the point you want to make). Queued topics go before automatic ones, oldest first, and get your full profile.
+- **Draft now:** Actions → *Draft a post* → *Run workflow* (choose `auto`, `news` or `fact`).
+- **Change the voice or rules:** `prompts/post-system-prompt.md`. **Change sources, schedule, limits:** `config.yml` and `.github/workflows/draft.yml`.
 
-## Setup
-1. **Airtable**: create tables `topics` and `profile` per `data/topics-table-schema.md`. Fill `profile` with the facts posts may use about you.
-2. **n8n credentials**: Airtable, Slack bot, Tavily, Groq (Header Auth `Authorization: Bearer …`), Google Gemini (Header Auth `x-goog-api-key`). Optional: LinkedIn OAuth2 (needs the "Share on LinkedIn" and "Sign In with LinkedIn using OpenID Connect" products on your LinkedIn app; the person id is the `sub` claim from `/v2/userinfo`).
-3. **n8n Variable** `slack_signing_secret` (used by Workflow B to verify Slack signatures).
-4. Copy `workflows/local-ids.example.json` to `workflows/raw/local-ids.json`, fill it (Airtable ids, Slack channel ids, timezone, credential ids), run `python3 scripts/localize.py`, import the four `workflows/raw/*.local.json` files.
-5. Set D as the error workflow of A, B and C. Activate B; put its production webhook URL in the Slack app manifest (`slack/app-manifest.yaml`) and install the app.
-6. Slack channel ids and timezone come from `local-ids.json`. In A's CONFIG: `MAX_HASHTAGS`, optional `POST_SIGNATURE`. In B's CONFIG: `PUBLISH_MODE`, `LINKEDIN_PERSON_ID`.
-7. Add a topic row, run A manually, approve in Slack with `PUBLISH_MODE=simulated` first.
+## Setup (once, about 20 minutes)
 
-## Changing the prompt or the rules
-Edit `prompts/post-generation-system-prompt.md` (post prompt and classifier prompt) or `scripts/build_workflows.py` (guardrail, node logic), then:
+### 1. AI keys (free)
+- Groq: <https://console.groq.com/keys>
+- Gemini: <https://aistudio.google.com/apikey>
+
+### 2. LinkedIn token
+1. Create an app at <https://www.linkedin.com/developers/apps>. LinkedIn asks you to link a Company Page; any page you admin works (you can create a small one).
+2. On the app's **Products** tab, add **Share on LinkedIn** and **Sign In with LinkedIn using OpenID Connect** (both self-serve).
+3. Open the **OAuth token generator** (<https://www.linkedin.com/developers/tools/oauth/token-generator>), pick your app, tick `openid`, `profile` and `w_member_social`, and generate.
+4. The token lasts **60 days** and LinkedIn does not let personal apps refresh it. The draft job opens a reminder issue 10 days before it expires, as long as you record the date (step 4).
+
+### 3. Your profile
+`profile.yml` holds the facts posts may use about you. It is gitignored; copy `profile.example.yml` if you don't have one. News and fact posts only see the keys in `config.yml` → `general_post_profile_keys`.
+
+### 4. Secrets and variables
+```bash
+gh secret set GROQ_API_KEY
+gh secret set GEMINI_API_KEY
+gh secret set LINKEDIN_ACCESS_TOKEN
+gh secret set PROFILE_YML < profile.yml
+gh variable set LINKEDIN_TOKEN_EXPIRES --body 2027-01-08   # the date 60 days after you generated the token
 ```
-python3 scripts/build_workflows.py && python3 scripts/localize.py
+Optional variables: `PUBLISH_MODE` (`simulated` by default, set to `linkedin` to post for real) and `TIMEZONE` (for "today" in prompts, e.g. `Europe/London`).
+
+### 5. Try it
+1. Actions → *Draft a post* → *Run workflow*. A `draft` issue appears within a minute.
+2. Comment `/approve`. In simulated mode it shows what would be posted and closes the issue.
+3. When you are happy: `gh variable set PUBLISH_MODE --body linkedin`.
+
+## Run it locally
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+DRY_RUN=1 GROQ_API_KEY=... .venv/bin/python -m poster.draft   # prints the issue instead of opening it
 ```
-and re-import A and B.
+
+## Costs and limits
+- GitHub Actions: each run takes about a minute; the free plan includes 2,000 minutes a month.
+- Hacker News search and Wikipedia: free, no key. Groq and Gemini: free tiers, a few calls per week.
+- Scheduled runs can start a few minutes late. If a scheduled run never fires, check the Actions tab for a disabled-workflow notice.
 
 ## Rule zero
-No API keys, tokens or passwords in any file in this repo. Credentials live only in the n8n vault. `workflows/raw/` is gitignored.
+No API keys, tokens or personal details in any committed file. Keys and your profile live only in GitHub secrets; `profile.yml` is gitignored.

@@ -9,3 +9,9 @@ workflows/raw/
 .DS_Store
 # Local-only material, not part of this repo
 archive/
+
+# Local secrets and environments
+profile.yml
+.venv/
+__pycache__/
+.pytest_cache/
