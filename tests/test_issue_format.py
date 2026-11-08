@@ -43,7 +43,7 @@ def test_replace_parts_keeps_rest_and_can_drop_translation():
     assert gh.parse_parts(new) == ("חדש.", "New text.")
     assert gh.parse_meta(new) == gh.parse_meta(body)
     assert "thin source" in new and "token expires soon" in new
-    assert new.count(gh.SECTION_START) == 1 and new.count("**עברית**") == 1
+    assert new.count(gh.SECTION_START) == 1 and new.count("_Part 1") == 1
     assert gh.parse_parts(gh.replace_parts(new, "", "Only English.")) == ("", "Only English.")
 
 

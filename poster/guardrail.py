@@ -158,7 +158,23 @@ def check_translation(he, en, *, today):
     return Result(True, post_text=he)
 
 
+def check_headline(headline, en, *, today, max_chars=90):
+    """One short Hebrew line; same no-new-numbers / no-links / no-hashtags rules as the translation."""
+    h = re.sub(r"\s+", " ", (headline or "")).strip().rstrip(".")
+    if not h:
+        return Result(False, "headline_missing", message="headline_missing: no headline returned")
+    if len(h) > max_chars:
+        return Result(False, "headline_too_long", [h], f"headline_too_long: {len(h)} > {max_chars}", h)
+    res = check_translation(h, en, today=today)
+    if not res.ok:
+        return Result(False, "headline_" + res.reason, res.offending, "headline " + res.message, h)
+    return Result(True, post_text=h)
+
+
 def translation_retry_note(res):
+    if res.reason.startswith("headline_"):
+        return ("\n\nYour previous headline was rejected (" + res.message + "). Write headline_he as one short Hebrew line, "
+                "3 to 8 words, about what the post says, with only numbers that appear in the English post and no hashtags or links.")
     if res.reason == "fact_check":
         return f"\n\nYour previous translation contained numbers that are not in the English post: {', '.join(res.offending)}. Keep exactly the numbers of the English post."
     if res.reason == "not_hebrew":

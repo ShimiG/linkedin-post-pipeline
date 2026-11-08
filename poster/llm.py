@@ -7,8 +7,8 @@ from .http import HttpError, request
 POST_SCHEMA = {"type": "OBJECT", "required": ["post_text", "hook", "facts_used", "warnings"], "properties": {
     "post_text": {"type": "STRING"}, "hook": {"type": "STRING"},
     "facts_used": {"type": "ARRAY", "items": {"type": "STRING"}}, "warnings": {"type": "ARRAY", "items": {"type": "STRING"}}}}
-TRANSLATION_SCHEMA = {"type": "OBJECT", "required": ["post_text_he", "notes"], "properties": {
-    "post_text_he": {"type": "STRING"}, "notes": {"type": "ARRAY", "items": {"type": "STRING"}}}}
+TRANSLATION_SCHEMA = {"type": "OBJECT", "required": ["headline_he", "post_text_he", "notes"], "properties": {
+    "headline_he": {"type": "STRING"}, "post_text_he": {"type": "STRING"}, "notes": {"type": "ARRAY", "items": {"type": "STRING"}}}}
 
 
 class LLMError(Exception):

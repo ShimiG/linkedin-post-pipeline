@@ -122,3 +122,17 @@ def test_translation_untranslated_paragraph_fails():
     r = guardrail.check_translation(he, EN_POST, today=TODAY)
     assert not r.ok and r.reason == "not_hebrew" and r.offending[0].startswith("How do you")
     assert "closing question" in guardrail.translation_retry_note(r)
+
+
+def test_headline_ok_and_trimmed():
+    r = guardrail.check_headline("  עריכת משקלות במקום אימון מחדש. ", EN_POST, today=TODAY)
+    assert r.ok and r.post_text == "עריכת משקלות במקום אימון מחדש"
+
+
+def test_headline_rules():
+    assert guardrail.check_headline("", EN_POST, today=TODAY).reason == "headline_missing"
+    assert guardrail.check_headline("Weights edited", EN_POST, today=TODAY).reason == "headline_not_hebrew"
+    assert guardrail.check_headline("שיפור פי 3 במודל", EN_POST, today=TODAY).reason == "headline_fact_check"
+    assert guardrail.check_headline("מודל " * 30, EN_POST, today=TODAY).reason == "headline_too_long"
+    r = guardrail.check_headline("שיפור פי 3 במודל", EN_POST, today=TODAY)
+    assert "headline" in guardrail.translation_retry_note(r)

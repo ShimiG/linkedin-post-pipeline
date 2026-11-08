@@ -18,6 +18,8 @@ After the English passes, the Hebrew translation is checked the same way, retrie
 2. `not_hebrew`: at least half of the letters must be Hebrew (English technical terms are fine).
 3. `fact_check`: every number in the Hebrew must be a number of the English post. The translator may not add, round or convert numbers.
 
+The Hebrew headline (`check_headline`) gets the same checks, plus: present, one line, at most 90 characters. A rejected headline retries the translation with the reason named.
+
 If no translation passes, the draft still opens with the English only and a review note; `/rewrite` tries again.
 
 Not failures, just review notes on the issue: the model's own warnings, and LinkedIn token expiry.

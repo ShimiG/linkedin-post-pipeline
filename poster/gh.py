@@ -128,8 +128,8 @@ def parse_parts(body):
 def post_section(he, en):
     """The editable post area of an issue: Hebrew block (if any) then English block, wrapped so it can be swapped whole."""
     if he:
-        inner = (f"**עברית** (posted first):\n\n{HE_START}\n{he}\n{HE_END}\n\n"
-                 f"**English** (posted second, after a separator line):\n\n{EN_START}\n{en}\n{EN_END}")
+        inner = (f"_Part 1, exactly as posted (headline, \"English below\" line, Hebrew text):_\n\n{HE_START}\n{he}\n{HE_END}\n\n"
+                 f"_Part 2, posted after a separator line:_\n\n{EN_START}\n{en}\n{EN_END}")
     else:
         inner = f"{EN_START}\n{en}\n{EN_END}"
     return f"{SECTION_START}\n{inner}\n{SECTION_END}"
@@ -144,7 +144,8 @@ def render_draft(topic, news_items, draft, extra_warnings=()):
     lines = [" · ".join(head), ""]
     if src:
         lines += [f"**Source:** [{topic['title']}]({src})" + (f" · [HN discussion]({topic['discussion_url']})" if topic.get("discussion_url") else ""), ""]
-    lines += ["The post (edit the text between the markers to change it by hand):", "", post_section(draft.post_text_he, draft.post_text), ""]
+    lines += ["The post. The notes in _italics_ are only for you; everything between the markers is posted. Edit it by hand if you like:", "",
+              post_section(draft.post_text_he, draft.post_text), ""]
     warnings = list(draft.warnings) + list(extra_warnings)
     if warnings:
         lines += ["> [!WARNING]", "> **Review notes**"] + [f"> - {w}" for w in warnings] + [""]

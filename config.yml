@@ -28,6 +28,8 @@ post:
 bilingual:
   enabled: true
   language: Hebrew             # the script check in guardrail.check_translation is Hebrew-specific
+  headline: true               # the post opens with a short Hebrew headline about the post...
+  english_marker: "*English below"   # ...then this line, then the Hebrew text
   separator: "• • •"           # line between the two versions
   max_total_chars: 3000        # LinkedIn's limit for the combined post
 
