@@ -105,3 +105,20 @@ def test_translation_hashtags_and_links_fail():
 def test_translation_retry_note():
     r = guardrail.check_translation("שיפור פי 3.", EN_POST, today=TODAY)
     assert "3" in guardrail.translation_retry_note(r)
+
+
+def test_tidy_fixes_dashes_and_paragraphs():
+    assert guardrail.tidy("One \u2014 two.\nThree.\nFour.") == "One - two.\n\nThree.\n\nFour."
+    assert guardrail.tidy("A.\n\nB.\n\n\n\nC.") == "A.\n\nB.\n\nC."
+
+
+def test_check_returns_tidied_post():
+    r = run("Line one \u2014 fine.\nLine two.")
+    assert r.ok and r.post_text == "Line one - fine.\n\nLine two."
+
+
+def test_translation_untranslated_paragraph_fails():
+    he = "מודל קיבל 48.1% אחרי עריכה של 0.016% מהמשקלות של המודל הקטן.\n\nHow do you keep your AI agents reliable?"
+    r = guardrail.check_translation(he, EN_POST, today=TODAY)
+    assert not r.ok and r.reason == "not_hebrew" and r.offending[0].startswith("How do you")
+    assert "closing question" in guardrail.translation_retry_note(r)

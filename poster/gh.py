@@ -18,7 +18,9 @@ LABELS = {
     "topic": ("1d76db", "A post idea you queued; drafted before automatic topics"),
     "published": ("5319e7", "Posted to LinkedIn"),
     "simulated": ("c5def5", "Approved in simulated mode, nothing was posted"),
-    "rejected": ("b60205", "Rejected, never posted"),
+    "rejected": ("b60205", "Rejected, never posted; the source may be drafted again after the cooldown"),
+    "blocked": ("000000", "This story or Wikipedia article is never drafted again (/unblock to undo)"),
+    "blocked-site": ("3f3f3f", "Stories from this website are never drafted again (/unblock to undo)"),
     "token-expiry": ("fbca04", "LinkedIn token needs renewing"),
 }
 
@@ -150,7 +152,9 @@ def render_draft(topic, news_items, draft, extra_warnings=()):
         lines += ["<details><summary>Facts used</summary>", ""] + [f"- {f}" for f in draft.facts_used] + ["", "</details>", ""]
     if src:
         lines += [f"**First comment** (posted under the post): Source: {src}", ""]
-    lines += ["---", "Reply with **`/approve`** to publish, **`/reject`** to drop it, or **`/rewrite <what to change>`** for an AI rewrite"
+    lines += ["---", "Reply with **`/approve`** to publish, **`/reject`** to drop this post, **`/block`** to drop it and never use this source again"
+              + (" (**`/block site`** for the whole website)" if topic["kind"] == "news" else "")
+              + ", or **`/rewrite <what to change>`** for an AI rewrite"
               + (" (the English is rewritten, then translated again)." if draft.post_text_he else "."), ""]
     meta = {"kind": topic["kind"], "topic": topic, "news": news_items}
     lines.append(f"<!-- meta: {json.dumps(meta, ensure_ascii=False).replace('-->', '--&gt;')} -->")

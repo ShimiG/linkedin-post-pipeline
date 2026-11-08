@@ -22,6 +22,16 @@ class Result:
     hashtags: int = 0
 
 
+def tidy(text):
+    """Deterministic clean-up the model keeps getting wrong: em-dashes, and paragraphs glued with single newlines."""
+    t = (text or "").replace("\r\n", "\n").strip()
+    t = re.sub(r"\s*\u2014\s*", " - ", t)                   # em-dash -> spaced hyphen
+    t = re.sub(r"[ \t]+\n", "\n", t)
+    if "\n\n" not in t and "\n" in t:                         # one paragraph per line -> blank line between
+        t = t.replace("\n", "\n\n")
+    return re.sub(r"\n{3,}", "\n\n", t)
+
+
 def norm(tok):
     t = re.sub(r"[#,+]", "", str(tok).strip())
     t = re.sub(r"[.,]$", "", t)
@@ -61,7 +71,7 @@ def sources_text(author, topic, news_items):
 
 
 def check(post, *, author, topic, news_items, today, max_chars, max_hashtags, signature=""):
-    post = (post or "").strip()
+    post = tidy(post)
     if not post:
         return Result(False, "llm_error", message="empty post_text")
     if signature and signature not in post:
@@ -116,7 +126,7 @@ LATIN_RE = re.compile(r"[A-Za-z]")
 
 def check_translation(he, en, *, today):
     """The translation may not introduce numbers, links or hashtags, and must actually be in Hebrew script."""
-    he = (he or "").strip()
+    he = tidy(he)
     if not he:
         return Result(False, "llm_error", message="empty translation")
     fail = lambda reason, off, msg: Result(False, reason, off, msg, he)
@@ -128,7 +138,14 @@ def check_translation(he, en, *, today):
         return fail("hashtags_in_translation", tags, "hashtags_in_translation: " + ", ".join(tags))
     heb, lat = len(HEBREW_RE.findall(he)), len(LATIN_RE.findall(he))
     if heb < 0.5 * (heb + lat):
-        return fail("not_hebrew", [], f"not_hebrew: only {heb} of {heb + lat} letters are Hebrew")
+        return fail("not_hebrew", [he[:60]], f"not_hebrew: only {heb} of {heb + lat} letters are Hebrew")
+    english_paras = []
+    for para in he.split("\n\n"):  # every paragraph, so one untranslated sentence cannot hide among Hebrew ones
+        heb, lat = len(HEBREW_RE.findall(para)), len(LATIN_RE.findall(para))
+        if heb + lat >= 15 and heb < 0.5 * (heb + lat):
+            english_paras.append(para[:60])
+    if english_paras:
+        return fail("not_hebrew", english_paras, "not_hebrew: paragraph(s) left untranslated: " + " | ".join(english_paras))
     allowed = allowed_numbers(en, today)
     offending = []
     for m in TOKEN_RE.finditer(he):
@@ -145,7 +162,7 @@ def translation_retry_note(res):
     if res.reason == "fact_check":
         return f"\n\nYour previous translation contained numbers that are not in the English post: {', '.join(res.offending)}. Keep exactly the numbers of the English post."
     if res.reason == "not_hebrew":
-        return "\n\nYour previous answer was not in Hebrew. Translate the whole post into Hebrew."
+        return "\n\nYour previous translation left these parts in English: " + " | ".join(res.offending) + ". Translate every paragraph, including the closing question, into Hebrew."
     if res.reason in ("contains_url", "hashtags_in_translation"):
         return f"\n\nYour previous translation included {', '.join(res.offending)}. Leave out links and hashtags."
     return "\n\nYour previous answer was not valid JSON. Return the JSON object only."

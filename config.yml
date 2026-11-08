@@ -40,6 +40,9 @@ news:
 # Profile keys given to news and fact posts (your own topics get the whole profile).
 general_post_profile_keys: [name, headline, focus, daily_tools]
 
+review:
+  reject_cooldown_days: 7      # a /reject-ed story or article may be drafted again after this many days (0 = right away). /block is forever.
+
 linkedin:
   token_warn_days: 10          # open a reminder issue this many days before LINKEDIN_TOKEN_EXPIRES
 

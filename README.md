@@ -14,7 +14,8 @@ schedule Mon/Wed/Fri ──▶ draft job
 
 you comment on the issue ──▶ review job
                            ├─ /approve          → one LinkedIn post (Hebrew, • • •, English) + source link as the first comment
-                           ├─ /reject           → closed, that source is never reused
+                           ├─ /reject           → closed; that story/article may come back after a 7-day cooldown
+                           ├─ /block [site]     → closed; that story/article (or the whole website) is never used again
                            └─ /rewrite <ask>    → English rewritten and re-checked, translated again, issue updated
 ```
 
@@ -24,6 +25,7 @@ The issues are the whole system of record: what was drafted, which sources were 
 - **Approve from your phone:** the GitHub mobile app notifies you about the new issue; reply `/approve`.
 - **Edit by hand:** edit the issue and change the Hebrew (`<!-- post-he:… -->`) or English (`<!-- post-en:… -->`) block, then `/approve`. What you approve is exactly what is posted: the Hebrew, a `• • •` line, then the English. Empty the Hebrew block to post English only.
 - **Bilingual on or off:** `config.yml` → `bilingual.enabled`. The separator line is `bilingual.separator`.
+- **Reject or block:** `/reject` drops just this post; its story or article can be drafted again after `review.reject_cooldown_days` (7). `/block` drops it and never uses that story or Wikipedia article again; `/block site` never uses that website again (news only). Both work on closed drafts too, and `/unblock` undoes them.
 - **Queue your own topic:** open an issue with the label `topic`. The title is the subject, the body is your notes (facts, the point you want to make). Queued topics go before automatic ones, oldest first, and get your full profile.
 - **Draft now:** Actions → *Draft a post* → *Run workflow* (choose `auto`, `news` or `fact`).
 - **Change the voice or rules:** `prompts/post-system-prompt.md`. **Change the translation style:** `prompts/translate-prompt.md`. **Change sources, schedule, limits:** `config.yml` and `.github/workflows/draft.yml`.

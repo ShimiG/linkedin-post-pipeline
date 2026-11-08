@@ -6,7 +6,7 @@
 """
 import os
 import sys
-from datetime import date
+from datetime import date, datetime, timezone
 
 from . import compose, gh, sources
 from .config import load_config, load_profile, today
@@ -14,18 +14,42 @@ from .config import load_config, load_profile, today
 DRY = os.environ.get("DRY_RUN") == "1"
 
 
-def history():
-    """What has been drafted before, read back from the draft issues themselves."""
-    used_hn, used_wiki, kinds = set(), set(), []
-    for i in gh.issues("draft"):
-        t = gh.parse_meta(i.get("body")).get("topic", {})
-        if t.get("hn_id"):
-            used_hn.add(str(t["hn_id"]))
-        if t.get("wiki_subject"):
-            used_wiki.add(t["wiki_subject"])
-        if t.get("kind") in ("news", "fact"):
-            kinds.append(t["kind"])  # newest first
-    return used_hn, used_wiki, (kinds[0] if kinds else None)
+class History:
+    """What earlier drafts mean for this run, read back from the draft issues themselves.
+
+    - open, published or simulated drafts: their story/article is skipped (no duplicates, no reposts)
+    - rejected: skipped only for review.reject_cooldown_days, then eligible again
+    - blocked: the story/article is skipped forever; blocked-site: every story from that website is
+    """
+
+    def __init__(self, issues, cooldown_days, now):
+        self.skip_hn, self.skip_wiki, self.blocked_wiki, self.blocked_sites, kinds = set(), set(), set(), set(), []
+        for i in issues:
+            labels = {l["name"] for l in i.get("labels", [])}
+            t = gh.parse_meta(i.get("body")).get("topic", {})
+            if t.get("kind") in ("news", "fact"):
+                kinds.append(t["kind"])  # newest first
+            if "blocked-site" in labels and t.get("source_url"):
+                self.blocked_sites.add(sources.host(t["source_url"]))
+            if "blocked" in labels or "blocked-site" in labels:
+                skip = True
+                if t.get("wiki_subject"):
+                    self.blocked_wiki.add(t["wiki_subject"])
+            elif "rejected" in labels:
+                closed = i.get("closed_at")
+                skip = bool(closed) and (now - datetime.fromisoformat(closed.replace("Z", "+00:00"))).days < cooldown_days
+            else:
+                skip = True
+            if skip and t.get("hn_id"):
+                self.skip_hn.add(str(t["hn_id"]))
+            if skip and t.get("wiki_subject"):
+                self.skip_wiki.add(t["wiki_subject"])
+        self.last_kind = kinds[0] if kinds else None
+
+
+def history(cfg):
+    days = int((cfg.get("review") or {}).get("reject_cooldown_days", 7))
+    return History(gh.issues("draft"), days, datetime.now(timezone.utc))
 
 
 def next_queued():
@@ -77,15 +101,16 @@ def main():
         print("warning: no profile (PROFILE_YML secret or profile.yml); posts will not sound like you")
     if not DRY:
         gh.ensure_labels()
-    used_hn, used_wiki, last_kind = history()
+    h = history(cfg)
     forced = os.environ.get("DRAFT_KIND", "auto").strip()
 
     picked, queued = None, next_queued() if forced in ("auto", "") else None
     if queued:
         picked = (queued, [])
     else:
-        for kind in kind_order(cfg, last_kind, forced):
-            picked = sources.pick_news(cfg, used_hn) if kind == "news" else sources.pick_fact(cfg, used_wiki)
+        for kind in kind_order(cfg, h.last_kind, forced):
+            picked = (sources.pick_news(cfg, h.skip_hn, h.blocked_sites) if kind == "news"
+                      else sources.pick_fact(cfg, h.skip_wiki, blocked=h.blocked_wiki))
             if picked:
                 break
             print(f"no usable {kind} source this run, trying the next kind")

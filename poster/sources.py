@@ -20,8 +20,8 @@ def host(url):
 
 
 # --------------------------------------------------------------------------- Hacker News
-def hn_candidates(cfg, used_ids, now=None):
-    """Recent AI stories with an external link, most points first, skipping ones already drafted."""
+def hn_candidates(cfg, used_ids, now=None, blocked_sites=()):
+    """Recent AI stories with an external link, most points first, skipping drafted stories and blocked websites."""
     n = cfg["news"]
     since = int((now or time.time()) - n["lookback_days"] * 86400)
     seen = {}
@@ -36,6 +36,8 @@ def hn_candidates(cfg, used_ids, now=None):
         for h in data.get("hits", []):
             sid = str(h.get("objectID"))
             if sid in used_ids or not h.get("url") or sid in seen:
+                continue
+            if host(h["url"]) in blocked_sites:
                 continue
             if host(h["url"]) in ("github.com", "youtube.com", "twitter.com", "x.com"):
                 continue  # repos and videos rarely give a readable article body
@@ -99,9 +101,9 @@ def article_text(url):
     return text[:ARTICLE_MAX_CHARS]
 
 
-def pick_news(cfg, used_ids):
+def pick_news(cfg, used_ids, blocked_sites=()):
     """First candidate whose article has enough text to ground a post. Returns (topic, news_items) or None."""
-    for c in hn_candidates(cfg, used_ids):
+    for c in hn_candidates(cfg, used_ids, blocked_sites=blocked_sites):
         text = article_text(c["url"])
         if len(text) < 300:
             print(f"skip {c['url']}: only {len(text)} chars readable")
@@ -131,11 +133,12 @@ def wiki_intro(title):
     return {"title": pg.get("title", title), "extract": extract[:ARTICLE_MAX_CHARS], "url": pg.get("fullurl", "")}
 
 
-def pick_fact(cfg, used_titles, rng=random):
-    subjects = [s for s in cfg["fact_subjects"] if s not in used_titles]
+def pick_fact(cfg, used_titles, rng=random, blocked=()):
+    allowed = [s for s in cfg["fact_subjects"] if s not in blocked]
+    subjects = [s for s in allowed if s not in used_titles]
     if not subjects:
-        print("every fact subject has been used; recycling the list")
-        subjects = list(cfg["fact_subjects"])
+        print("every fact subject has been used; recycling the list (blocked ones stay out)")
+        subjects = list(allowed)
     rng.shuffle(subjects)
     for s in subjects[:5]:
         try:

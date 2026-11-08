@@ -1,6 +1,6 @@
 name: Review command
 
-# /approve, /reject or /rewrite <instruction> commented on an open `draft` issue.
+# /approve, /reject, /rewrite <instruction> on an open `draft` issue; /block [site] and /unblock also on closed ones.
 on:
   issue_comment:
     types: [created]
@@ -19,7 +19,7 @@ jobs:
     if: >-
       github.event.comment.user.login == github.repository_owner &&
       !github.event.issue.pull_request &&
-      github.event.issue.state == 'open' &&
+      (github.event.issue.state == 'open' || startsWith(github.event.comment.body, '/block') || startsWith(github.event.comment.body, '/unblock')) &&
       contains(github.event.issue.labels.*.name, 'draft') &&
       startsWith(github.event.comment.body, '/')
     runs-on: ubuntu-latest

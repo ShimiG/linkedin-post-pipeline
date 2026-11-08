@@ -53,9 +53,41 @@ def test_approve_linkedin_error_keeps_issue_open(board, monkeypatch):
     assert [e[0] for e in board] == ["comment"] and "token expired" in board[0][1][1]
 
 
-def test_reject(board):
-    review.reject(issue())
+def test_reject_does_not_block(board):
+    review.reject({**CFG, "review": {"reject_cooldown_days": 7}}, issue())
     assert ("close", (7, "not_planned"), {}) in board
+    assert ("add_labels", (7, ["rejected"]), {}) in board
+    text = board[1][1][1]
+    assert "after 7 days" in text and "/block" in text
+
+
+def test_block_story_and_site(board, monkeypatch):
+    review.block(issue(), "")
+    assert ("add_labels", (7, ["blocked"]), {}) in board and ("close", (7, "not_planned"), {}) in board
+    board.clear()
+    review.block(issue(), "site")
+    assert ("add_labels", (7, ["blocked", "blocked-site"]), {}) in board
+    assert "ex.com" in [e for e in board if e[0] == "comment"][0][1][1]
+
+
+def test_block_on_closed_issue_does_not_close_again(board):
+    i = issue(); i["state"] = "closed"
+    review.block(i, "")
+    assert not [e for e in board if e[0] == "close"]
+
+
+def test_block_site_refused_for_facts(board):
+    i = issue()
+    i["body"] = i["body"].replace('"kind": "news"', '"kind": "fact"')
+    review.block(i, "site")
+    assert [e[0] for e in board] == ["comment"] and "only works on news" in board[0][1][1]
+
+
+def test_unblock(board, monkeypatch):
+    removed = []
+    monkeypatch.setattr(gh, "remove_label", lambda n, l: removed.append(l))
+    review.unblock(issue(("draft", "blocked", "blocked-site")))
+    assert removed == ["blocked", "blocked-site"]
 
 
 def test_rewrite_updates_only_the_post(board, monkeypatch):
