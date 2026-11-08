@@ -84,7 +84,47 @@ def sources_text(author, topic, news_items):
     return "\n".join(parts)
 
 
-def check(post, *, author, topic, news_items, today, max_chars, max_hashtags, signature=""):
+FIRST_PERSON = re.compile(r"\b(I|I'm|I’m|I've|I’ve|I'd|I’d|me|my|myself)\b")
+STOPWORDS = set("that this with from have been were they their them when what which about into than then there these those would could should after before since over just also very more most only even much many some such your youre".split())
+
+
+def content_words(text):
+    return {w for w in re.findall(r"[a-z][a-z'’]{3,}", text.lower()) if w not in STOPWORDS}
+
+
+def borrowed_first_person(post, author, news_items, threshold=0.6, min_words=4):
+    """First-person sentences that mostly reuse the article's words: the article author's story told as the poster's own.
+    Sentences backed by the poster's profile are allowed."""
+    src = set().union(*(content_words(str(n.get("snippet", "")) + " " + str(n.get("title", ""))) for n in news_items)) if news_items else set()
+    mine = content_words(" ".join(f"{k} {v}" for k, v in (author or {}).items()))
+    hits = []
+    for sent in re.split(r"(?<=[.!?])\s+|\n+", post):
+        if not FIRST_PERSON.search(sent):
+            continue
+        words = content_words(sent) - mine
+        if len(words) >= min_words and len(words & src) / len(words) >= threshold:
+            hits.append(sent.strip()[:120])
+    return hits
+
+
+def _words(text):
+    return re.findall(r"[a-z0-9'’]+", text.lower())
+
+
+def copied_phrase(post, examples, n=8):
+    """The first run of n consecutive words the post shares with any example, or ''."""
+    words = _words(post)
+    grams = {" ".join(words[i:i + n]) for i in range(len(words) - n + 1)}
+    for ex in examples or []:
+        ew = _words(ex)
+        for i in range(len(ew) - n + 1):
+            g = " ".join(ew[i:i + n])
+            if g in grams:
+                return g
+    return ""
+
+
+def check(post, *, author, topic, news_items, today, max_chars, max_hashtags, signature="", examples=(), copy_ngram=8):
     post = tidy(post)
     if not post:
         return Result(False, "llm_error", message="empty post_text")
@@ -115,6 +155,15 @@ def check(post, *, author, topic, news_items, today, max_chars, max_hashtags, si
     if bad:
         return fail("unverified_source", bad, "unverified_source: " + ", ".join(bad))
 
+    copied = copied_phrase(body, examples, copy_ngram) if examples else ""
+    if copied:
+        return fail("copied_from_example", [copied], f"copied_from_example: \"{copied}\"")
+
+    if topic.get("kind") == "news":
+        borrowed = borrowed_first_person(body, author, news_items)
+        if borrowed:
+            return fail("borrowed_first_person", borrowed, "borrowed_first_person: " + " | ".join(borrowed))
+
     tags = HASHTAG_RE.findall(body)
     if len(tags) > max_hashtags:
         return fail("too_many_hashtags", [t.strip() for t in tags], f"too_many_hashtags: {len(tags)} > {max_hashtags}")
@@ -125,7 +174,12 @@ def retry_note(res):
     why = {"unverified_source": "named sources or companies that are not in the input",
            "too_many_hashtags": "used too many hashtags",
            "contains_url": "included a link (links go in the first comment, never in the post)",
-           "fact_check": "used figures not present in the input"}.get(res.reason)
+           "fact_check": "used figures not present in the input",
+           "borrowed_first_person": "retold the article author's own experience in the first person, as if it were yours",
+           "copied_from_example": "copied wording from a style example"}.get(res.reason)
+    if res.reason == "borrowed_first_person":
+        return (f"\n\nYour previous draft {why}: {' | '.join(res.offending)}. Those are the article author's experiences. "
+                "Attribute them in the third person (\"the author writes…\", \"a developer found…\") and keep \"I\" for facts from author only.")
     if why and res.offending:
         return f"\n\nYour previous draft {why}: {', '.join(res.offending)}. Do not use them. Rewrite the post using only facts from the input."
     if res.reason == "too_long":

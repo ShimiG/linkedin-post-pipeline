@@ -8,7 +8,8 @@ schedule Mon/Wed/Fri ──▶ draft job
                            │    AI news   ← Hacker News (top AI story this week) + the article text
                            │    coding fact ← a Wikipedia article from config.yml
                            ├─ Groq writes the post in your voice (Gemini as fallback)
-                           ├─ guardrail: every number and outlet must be in the sources, no links, ≤ 3 hashtags
+                           ├─ guardrail: every number and outlet must be in the sources, no links, ≤ 3 hashtags,
+                           │    no article story retold as yours, no wording copied from your examples
                            ├─ Hebrew translation + headline, checked: Hebrew script, no new numbers, no links or hashtags
                            └─ opens a `draft` issue  ──▶ you get a GitHub notification
 
@@ -26,6 +27,7 @@ The issues are the whole system of record: what was drafted, which sources were 
 - **Edit by hand:** edit the issue and change the Hebrew (`<!-- post-he:… -->`) or English (`<!-- post-en:… -->`) block, then `/approve`. What you approve is exactly what is posted: the Hebrew block (headline, `*English below`, Hebrew text), a `• • •` line, then the English. Empty the Hebrew block to post English only. The _italic_ notes in the issue are never posted.
 - **Bilingual on or off:** `config.yml` → `bilingual.enabled`. The headline is `bilingual.headline`, the line under it `bilingual.english_marker`, the separator `bilingual.separator`.
 - **Reject or block:** `/reject` drops just this post; its story or article can be drafted again after `review.reject_cooldown_days` (7). `/block` drops it and never uses that story or Wikipedia article again; `/block site` never uses that website again (news only). Both work on closed drafts too, and `/unblock` undoes them.
+- **Writing examples:** posts you like teach the drafts your style. Open an issue labelled `example` (title: why you like it, body: the post text), or comment `/example` on one of your own drafts. They are saved in `examples/`; each draft sees 3 of them as style references, never as facts, and a draft that copies 8 words in a row from one is rejected.
 - **Queue your own topic:** open an issue with the label `topic`. The title is the subject, the body is your notes (facts, the point you want to make). Queued topics go before automatic ones, oldest first, and get your full profile.
 - **Draft now:** Actions → *Draft a post* → *Run workflow* (choose `auto`, `news` or `fact`).
 - **Change the voice or rules:** `prompts/post-system-prompt.md`. **Change the translation style:** `prompts/translate-prompt.md`. **Change sources, schedule, limits:** `config.yml` and `.github/workflows/draft.yml`.

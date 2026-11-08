@@ -42,6 +42,11 @@ news:
 # Profile keys given to news and fact posts (your own topics get the whole profile).
 general_post_profile_keys: [name, headline, focus, daily_tools]
 
+examples:
+  per_draft: 3                 # saved examples (examples/*.md) shown to the model as style references
+  max_chars: 1500              # each example is trimmed to this
+  copy_ngram: 8                # a draft sharing this many consecutive words with an example is rejected
+
 review:
   reject_cooldown_days: 7      # a /reject-ed story or article may be drafted again after this many days (0 = right away). /block is forever.
 

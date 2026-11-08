@@ -2,10 +2,12 @@
 import json
 from dataclasses import dataclass, field
 
+from . import examples as examples_mod
 from . import guardrail, llm
 from .config import prompt_text, system_prompt, today
 
 NEWS_SNIPPET_CHARS = 1500
+EMPTY_NOTES = {"", "none", "n/a", "na", "no warnings", "nothing", "-"}
 
 
 @dataclass
@@ -96,7 +98,7 @@ def add_translation(cfg, draft):
         return draft
     try:
         draft.post_text_he, draft.translation_model, notes = translate(cfg, draft.post_text)
-        draft.warnings += [f"Translation: {n}" for n in notes]
+        draft.warnings += [f"Translation: {n}" for n in notes if n.strip().lower().strip(".") not in EMPTY_NOTES]
     except RuntimeError as e:
         draft.warnings.append(f"{language} translation failed ({e}). Only the English text will be posted; comment /rewrite to try again.")
         return draft
@@ -119,12 +121,23 @@ def rewrite_message(instruction, current, data):
                .replace("{input}", json.dumps(data, ensure_ascii=False, indent=2)))
 
 
-def write(cfg, author, topic, news_items, *, instruction=None, current=None):
+def examples_block(texts):
+    """Style references go in the message, not in the input JSON, so they are never treated as fact sources."""
+    if not texts:
+        return ""
+    joined = "\n\n---\n\n".join(texts)
+    return ("\n\nSTYLE EXAMPLES: posts the author likes. Learn their tone, rhythm, length, hook and how they close. "
+            "Do not reuse their sentences or phrases, and take no facts, numbers or names from them.\n\n---\n\n" + joined + "\n\n---")
+
+
+def write(cfg, author, topic, news_items, *, instruction=None, current=None, examples=None):
     """Generate until the guardrail passes or attempts run out. Returns Draft, or raises RuntimeError with the last reason."""
     L, P = cfg["llm"], cfg["post"]
     system = system_prompt(cfg)
     data = payload(cfg, author, topic, news_items)
+    ex = examples_mod.load(cfg) if examples is None else examples
     base = rewrite_message(instruction, current, data) if instruction else "Write the post for this input:\n" + json.dumps(data, ensure_ascii=False, indent=2)
+    base += examples_block(ex)
     providers = [L["primary"], L["fallback"]]
     provider, note, last = providers[0], "", "no attempt made"
     for attempt in range(1, L["max_attempts"] + 1):
@@ -138,9 +151,10 @@ def write(cfg, author, topic, news_items, *, instruction=None, current=None):
             note = ""
             continue
         res = guardrail.check(out.get("post_text", ""), author=author, topic=topic, news_items=news_items, today=today(cfg),
-                              max_chars=P["max_chars"], max_hashtags=P["max_hashtags"], signature=P.get("signature") or "")
+                              max_chars=P["max_chars"], max_hashtags=P["max_hashtags"], signature=P.get("signature") or "",
+                              examples=ex, copy_ngram=int((cfg.get("examples") or {}).get("copy_ngram", 8)))
         if res.ok:
-            warnings = [str(w) for w in out.get("warnings") or [] if str(w).strip()]
+            warnings = [str(w) for w in out.get("warnings") or [] if str(w).strip().lower().strip(".") not in EMPTY_NOTES]
             d = Draft(res.post_text, str(out.get("hook", ""))[:200], [str(f) for f in out.get("facts_used") or []],
                       warnings, model, provider, attempt, res.hashtags)
             return add_translation(cfg, d)
