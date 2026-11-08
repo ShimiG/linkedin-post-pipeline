@@ -5,12 +5,12 @@ Inputs come from the workflow as env vars (never interpolated into shell): ISSUE
 import os
 import sys
 
-from . import compose, gh, linkedin
+from . import compose, gh, linkedin, sources
 from .config import load_config, load_profile
 from .draft import author_for
 
 LINKEDIN_MAX = 3000
-HELP = "Commands: **`/approve`** publishes the text between the markers, **`/reject`** drops it, **`/rewrite <what to change>`** asks the AI for a new version."
+HELP = "Commands: **`/approve`** publishes the text between the markers (Hebrew first, then English), **`/reject`** drops this post, **`/block`** (or **`/block site`**) drops it and never uses that source again, **`/rewrite <what to change>`** asks the AI for a new version."
 
 
 def parse_command(text):
@@ -25,9 +25,10 @@ def approve(cfg, issue):
     n, labels = issue["number"], {l["name"] for l in issue.get("labels", [])}
     if "published" in labels:
         return gh.comment(n, "Already published, nothing to do.")
-    post = gh.parse_post(issue.get("body"))
+    he, en = gh.parse_parts(issue.get("body"))
+    post = compose.combine(cfg, he, en)
     if not post:
-        return gh.comment(n, ":x: I can't find the post. Keep the `<!-- post:start -->` and `<!-- post:end -->` markers around the text.")
+        return gh.comment(n, ":x: I can't find the post. Keep the `<!-- post-…:start -->` / `<!-- post-…:end -->` markers around the text.")
     if len(post) > LINKEDIN_MAX:
         return gh.comment(n, f":x: The post is {len(post)} characters; LinkedIn allows {LINKEDIN_MAX}. Shorten it and `/approve` again.")
     meta = gh.parse_meta(issue.get("body"))
@@ -52,28 +53,55 @@ def approve(cfg, issue):
     gh.close(n)
 
 
-def reject(issue):
+def reject(cfg, issue):
+    days = int((cfg.get("review") or {}).get("reject_cooldown_days", 7))
     gh.add_labels(issue["number"], ["rejected"])
-    gh.comment(issue["number"], "Rejected. Nothing was posted, and this source will not be picked again.")
+    again = f"after {days} days" if days else "on a later run"
+    gh.comment(issue["number"], f"Rejected. Nothing was posted. This story or article may be drafted again {again}. "
+               "To never use it again comment **`/block`**, or **`/block site`** to drop every story from that website.")
     gh.close(issue["number"], "not_planned")
+
+
+def block(issue, arg):
+    n = issue["number"]
+    topic = gh.parse_meta(issue.get("body")).get("topic", {})
+    labels = ["blocked"]
+    if arg == "site":
+        if topic.get("kind") != "news" or not topic.get("source_url"):
+            return gh.comment(n, "`/block site` only works on news drafts (fact posts all come from Wikipedia). Use **`/block`** to block just this article.")
+        labels.append("blocked-site")
+    elif arg:
+        return gh.comment(n, "Use **`/block`** for this story or article, or **`/block site`** for its whole website.")
+    gh.add_labels(n, labels)
+    what = f"every story from **{sources.host(topic['source_url'])}**" if arg == "site" else "this story/article"
+    gh.comment(n, f"Blocked: {what} will never be drafted again. Comment **`/unblock`** to undo.")
+    if issue.get("state") == "open":
+        gh.close(n, "not_planned")
+
+
+def unblock(issue):
+    for label in ("blocked", "blocked-site"):
+        gh.remove_label(issue["number"], label)
+    gh.comment(issue["number"], "Unblocked: this source can be drafted again.")
 
 
 def rewrite(cfg, issue, instruction):
     n = issue["number"]
     if not instruction:
         return gh.comment(n, "Tell me what to change, e.g. `/rewrite shorter, and end with a question about testing`.")
-    meta, current = gh.parse_meta(issue.get("body")), gh.parse_post(issue.get("body"))
+    meta, (_, current) = gh.parse_meta(issue.get("body")), gh.parse_parts(issue.get("body"))
     topic = meta.get("topic")
     if not topic or not current:
-        return gh.comment(n, ":x: This issue is missing its draft markers or hidden metadata, so I can't rewrite it.")
+        return gh.comment(n, ":x: This issue is missing its English draft or hidden metadata, so I can't rewrite it.")
     try:
         d = compose.write(cfg, author_for(cfg, load_profile(), topic["kind"]), topic, meta.get("news", []),
                           instruction=instruction, current=current)
     except RuntimeError as e:
         return gh.comment(n, f":x: Rewrite failed: {e}. The draft is unchanged.")
-    gh.update_issue(n, body=gh.replace_post(issue["body"], d.post_text))
+    gh.update_issue(n, body=gh.replace_parts(issue["body"], d.post_text_he, d.post_text))
     notes = "".join(f"\n- {w}" for w in d.warnings)
-    gh.comment(n, f"Rewritten ({d.words} words, `{d.model}`). The issue text above now holds the new version."
+    translated = " and translated" if d.post_text_he else ""
+    gh.comment(n, f"Rewritten{translated} ({d.words} words, `{d.model}`). The issue text above now holds the new version."
                + (f"\n\n**Review notes:**{notes}" if notes else "") + "\n\n" + HELP)
 
 
@@ -85,13 +113,20 @@ def main():
         print("not a command, ignoring")
         return
     issue = gh.call("GET", f"/issues/{number}")
-    if "draft" not in {l["name"] for l in issue.get("labels", [])} or issue.get("state") != "open":
-        print("not an open draft issue, ignoring")
+    if "draft" not in {l["name"] for l in issue.get("labels", [])}:
+        print("not a draft issue, ignoring")
+        return
+    if issue.get("state") != "open" and cmd not in ("/block", "/unblock"):
+        print("closed draft: only /block and /unblock apply, ignoring")
         return
     if cmd == "/approve":
         approve(cfg, issue)
     elif cmd == "/reject":
-        reject(issue)
+        reject(cfg, issue)
+    elif cmd == "/block":
+        block(issue, arg.lower())
+    elif cmd == "/unblock":
+        unblock(issue)
     elif cmd == "/rewrite":
         rewrite(cfg, issue, arg)
     else:

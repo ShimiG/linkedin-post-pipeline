@@ -12,8 +12,16 @@ Checks, in order (the first failure wins; each failure is retried up to `llm.max
 5. `unverified_source`: a known outlet or company (TechCrunch, Reuters, The Verge, Bloomberg, Wired, GitHub, Stack Overflow, Hacker News, Wikipedia and others) named in the post must appear in the sources.
 6. `too_many_hashtags`: more `#tags` than `post.max_hashtags`.
 
+## Translation checks (`check_translation`)
+After the English passes, the Hebrew translation is checked the same way, retried up to `llm.max_attempts` times:
+1. `contains_url` / `hashtags_in_translation`: no links, and no hashtags (the English part keeps them).
+2. `not_hebrew`: at least half of the letters must be Hebrew (English technical terms are fine).
+3. `fact_check`: every number in the Hebrew must be a number of the English post. The translator may not add, round or convert numbers.
+
+If no translation passes, the draft still opens with the English only and a review note; `/rewrite` tries again.
+
 Not failures, just review notes on the issue: the model's own warnings, and LinkedIn token expiry.
 
-`/approve` does not re-run these checks: what you approve is what gets posted, after a 3000-character limit check. Edit the text by hand freely.
+`/approve` does not re-run these checks: what you approve is what gets posted (Hebrew, separator, English), after a 3000-character limit check on the combined text. Edit the text by hand freely.
 
 `post.signature` (optional, default empty): a fixed last line, appended if missing and excluded from all checks.

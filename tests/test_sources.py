@@ -42,3 +42,15 @@ def test_pick_fact_skips_used_and_missing(monkeypatch):
     monkeypatch.setattr(sources, "wiki_intro", fake_intro)
     topic, news = sources.pick_fact(CFG, used_titles={"Git"}, rng=random.Random(1))
     assert calls == ["UTF-8"] and topic["wiki_subject"] == "UTF-8" and news[0]["source"] == "wikipedia.org"
+
+
+def test_blocked_sites_filtered(monkeypatch):
+    hits = [{"objectID": "9", "title": "X", "url": "https://www.spam.io/a", "points": 500, "created_at_i": 1762600000}]
+    monkeypatch.setattr(sources, "get_json", lambda url, **kw: {"hits": hits})
+    assert sources.hn_candidates(CFG, set(), now=1762700000, blocked_sites={"spam.io"}) == []
+
+
+def test_blocked_fact_never_recycled(monkeypatch):
+    monkeypatch.setattr(sources, "wiki_intro", lambda t: {"title": t, "extract": "x" * 300, "url": "u"})
+    topic, _ = sources.pick_fact(CFG, used_titles={"Git", "UTF-8"}, rng=random.Random(1), blocked={"Git"})
+    assert topic["wiki_subject"] == "UTF-8"  # all used -> recycle, but never the blocked one

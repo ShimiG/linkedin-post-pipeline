@@ -18,10 +18,74 @@ class Draft:
     provider: str = ""
     attempt: int = 1
     hashtags: int = 0
+    post_text_he: str = ""        # translation, published first; empty when bilingual is off or translation failed
+    translation_model: str = ""
 
     @property
     def words(self):
         return len(self.post_text.split())
+
+
+def combine(cfg, he, en):
+    """The text that is actually published: translation, separator, English. English only when there is no translation."""
+    he, en = (he or "").strip(), (en or "").strip()
+    if not he:
+        return en
+    if not en:
+        return he
+    sep = (cfg.get("bilingual") or {}).get("separator") or ""
+    return f"{he}\n\n{sep}\n\n{en}" if sep else f"{he}\n\n{en}"
+
+
+def bilingual(cfg):
+    b = cfg.get("bilingual") or {}
+    return bool(b.get("enabled")), str(b.get("language") or "Hebrew")
+
+
+def translate(cfg, english):
+    """English post -> Hebrew, checked. Returns (hebrew, model, notes). Raises RuntimeError when no attempt passes."""
+    L = cfg["llm"]
+    _, language = bilingual(cfg)
+    s = prompt_text("translate-prompt.md")
+    system = s.split("<!-- TRANSLATE PROMPT START -->", 1)[1].split("<!-- TRANSLATE PROMPT END -->", 1)[0].strip()
+    system = system.replace("Hebrew", language)
+    base = "Translate this LinkedIn post:\n\n" + english
+    providers = [L["primary"], L["fallback"]]
+    provider, note, last = providers[0], "", "no attempt made"
+    for attempt in range(1, L["max_attempts"] + 1):
+        try:
+            out, model = llm.generate(cfg, provider, system, base + note, L["retry_temperature"], schema=llm.TRANSLATION_SCHEMA)
+        except llm.LLMError as e:
+            last = f"llm_error: {e}"
+            print(f"translation attempt {attempt}: {last}")
+            provider = providers[1] if provider == providers[0] else providers[0]
+            note = ""
+            continue
+        res = guardrail.check_translation(out.get("post_text_he", ""), english, today=today(cfg))
+        if res.ok:
+            return res.post_text, model, [str(n) for n in out.get("notes") or [] if str(n).strip()]
+        last = res.message
+        print(f"translation attempt {attempt}: {res.message}")
+        note = guardrail.translation_retry_note(res)
+    raise RuntimeError(f"translation failed after {L['max_attempts']} attempts; last: {last}")
+
+
+def add_translation(cfg, draft):
+    """Fill draft.post_text_he. A failed translation never loses the English draft: it becomes a review note."""
+    on, language = bilingual(cfg)
+    if not on:
+        return draft
+    try:
+        draft.post_text_he, draft.translation_model, notes = translate(cfg, draft.post_text)
+        draft.warnings += [f"Translation: {n}" for n in notes]
+    except RuntimeError as e:
+        draft.warnings.append(f"{language} translation failed ({e}). Only the English text will be posted; comment /rewrite to try again.")
+        return draft
+    total = len(combine(cfg, draft.post_text_he, draft.post_text))
+    limit = int((cfg.get("bilingual") or {}).get("max_total_chars") or 3000)
+    if total > limit:
+        draft.warnings.append(f"The combined post is {total} characters, over LinkedIn's {limit}. Shorten it (or /rewrite shorter) before approving.")
+    return draft
 
 
 def payload(cfg, author, topic, news_items):
@@ -58,8 +122,9 @@ def write(cfg, author, topic, news_items, *, instruction=None, current=None):
                               max_chars=P["max_chars"], max_hashtags=P["max_hashtags"], signature=P.get("signature") or "")
         if res.ok:
             warnings = [str(w) for w in out.get("warnings") or [] if str(w).strip()]
-            return Draft(res.post_text, str(out.get("hook", ""))[:200], [str(f) for f in out.get("facts_used") or []],
-                         warnings, model, provider, attempt, res.hashtags)
+            d = Draft(res.post_text, str(out.get("hook", ""))[:200], [str(f) for f in out.get("facts_used") or []],
+                      warnings, model, provider, attempt, res.hashtags)
+            return add_translation(cfg, d)
         last = res.message
         print(f"attempt {attempt}: guardrail {res.message}")
         note = guardrail.retry_note(res)
