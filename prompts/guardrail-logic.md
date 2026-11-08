@@ -10,7 +10,9 @@ Checks, in order (the first failure wins; each failure is retried up to `llm.max
 3. `contains_url`: any link in the post body. Links cut reach, so the source goes in the first comment instead.
 4. `fact_check`: every numeric token in the post must normalise to a number present in the sources. Token rule: a digit not glued to a letter, optional `K/M/B` suffix not followed by a letter, or the words thousand/million/billion; commas, `+` and `#` stripped. So "B2B" is not a number, "1.1 million" equals "1.1M", and the current year is allowed.
 5. `unverified_source`: a known outlet or company (TechCrunch, Reuters, The Verge, Bloomberg, Wired, GitHub, Stack Overflow, Hacker News, Wikipedia and others) named in the post must appear in the sources.
-6. `too_many_hashtags`: more `#tags` than `post.max_hashtags`.
+6. `copied_from_example`: the post shares `examples.copy_ngram` (8) consecutive words with a saved writing example. Examples are for style only.
+7. `borrowed_first_person` (news posts only): a sentence with "I / my / me" whose content words mostly (60%+) come from the article and not from your profile. That is the article author's experience retold as yours; the retry asks for third-person attribution ("a developer wrote that…").
+8. `too_many_hashtags`: more `#tags` than `post.max_hashtags`.
 
 ## Translation checks (`check_translation`)
 After the English passes, the Hebrew translation is checked the same way, retried up to `llm.max_attempts` times:

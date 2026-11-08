@@ -1,0 +1,35 @@
+name: Save writing example
+
+# An issue labelled `example` (title: why you like it, body: the post text) becomes a file in examples/.
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: poster
+  cancel-in-progress: false
+
+jobs:
+  save:
+    if: >-
+      github.event.sender.login == github.repository_owner &&
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'example')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Save the example
+        run: python -m poster.examples
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

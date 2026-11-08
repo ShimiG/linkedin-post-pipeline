@@ -1,12 +1,12 @@
 name: Review command
 
-# /approve, /reject, /rewrite <instruction> on an open `draft` issue; /block [site] and /unblock also on closed ones.
+# /approve, /reject, /rewrite <instruction> on an open `draft` issue; /block [site], /unblock and /example also on closed ones.
 on:
   issue_comment:
     types: [created]
 
 permissions:
-  contents: read
+  contents: write   # /example saves a file to examples/
   issues: write
 
 concurrency:
@@ -19,7 +19,7 @@ jobs:
     if: >-
       github.event.comment.user.login == github.repository_owner &&
       !github.event.issue.pull_request &&
-      (github.event.issue.state == 'open' || startsWith(github.event.comment.body, '/block') || startsWith(github.event.comment.body, '/unblock')) &&
+      (github.event.issue.state == 'open' || startsWith(github.event.comment.body, '/block') || startsWith(github.event.comment.body, '/unblock') || startsWith(github.event.comment.body, '/example')) &&
       contains(github.event.issue.labels.*.name, 'draft') &&
       startsWith(github.event.comment.body, '/')
     runs-on: ubuntu-latest

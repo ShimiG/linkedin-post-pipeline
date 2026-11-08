@@ -1,4 +1,5 @@
 """GitHub issues as the review board and the system of record (no database, no commits from the bot)."""
+import base64
 import json
 import os
 import re
@@ -22,6 +23,7 @@ LABELS = {
     "blocked": ("000000", "This story or Wikipedia article is never drafted again (/unblock to undo)"),
     "blocked-site": ("3f3f3f", "Stories from this website are never drafted again (/unblock to undo)"),
     "token-expiry": ("fbca04", "LinkedIn token needs renewing"),
+    "example": ("d4c5f9", "A post you like: saved to examples/ as a writing example"),
 }
 
 
@@ -93,6 +95,14 @@ def remove_label(number, label):
     except HttpError as e:
         if e.status != 404:
             raise
+
+
+def put_file(path, text, message, branch=None):
+    """Create a file on the default branch through the Contents API (no checkout or git push needed)."""
+    body = {"message": message, "content": base64.b64encode(text.encode()).decode()}
+    if branch:
+        body["branch"] = branch
+    return call("PUT", f"/contents/{urllib.parse.quote(path)}", body)
 
 
 def close(number, reason="completed"):

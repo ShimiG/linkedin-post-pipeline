@@ -5,12 +5,12 @@ Inputs come from the workflow as env vars (never interpolated into shell): ISSUE
 import os
 import sys
 
-from . import compose, gh, linkedin, sources
+from . import compose, examples, gh, linkedin, sources
 from .config import load_config, load_profile
 from .draft import author_for
 
 LINKEDIN_MAX = 3000
-HELP = "Commands: **`/approve`** publishes the text between the markers (Hebrew first, then English), **`/reject`** drops this post, **`/block`** (or **`/block site`**) drops it and never uses that source again, **`/rewrite <what to change>`** asks the AI for a new version."
+HELP = "Commands: **`/approve`** publishes the text between the markers (Hebrew first, then English), **`/reject`** drops this post, **`/block`** (or **`/block site`**) drops it and never uses that source again, **`/rewrite <what to change>`** asks the AI for a new version, **`/example`** saves it as a writing example."
 
 
 def parse_command(text):
@@ -79,6 +79,18 @@ def block(issue, arg):
         gh.close(n, "not_planned")
 
 
+def save_example(issue, why):
+    """/example on a draft: keep its English text as a writing example (yours, so `source: own`)."""
+    n = issue["number"]
+    _, en = gh.parse_parts(issue.get("body"))
+    if not en:
+        return gh.comment(n, ":x: No English text found in this draft to save.")
+    labels = {l["name"] for l in issue.get("labels", [])}
+    path = examples.save(en, why=why or ("my published post" if "published" in labels else issue.get("title", "")),
+                         source="own", issue_number=n)
+    gh.comment(n, f"Saved as a writing example: `{path}`.")
+
+
 def unblock(issue):
     for label in ("blocked", "blocked-site"):
         gh.remove_label(issue["number"], label)
@@ -116,8 +128,8 @@ def main():
     if "draft" not in {l["name"] for l in issue.get("labels", [])}:
         print("not a draft issue, ignoring")
         return
-    if issue.get("state") != "open" and cmd not in ("/block", "/unblock"):
-        print("closed draft: only /block and /unblock apply, ignoring")
+    if issue.get("state") != "open" and cmd not in ("/block", "/unblock", "/example"):
+        print("closed draft: only /block, /unblock and /example apply, ignoring")
         return
     if cmd == "/approve":
         approve(cfg, issue)
@@ -127,6 +139,8 @@ def main():
         block(issue, arg.lower())
     elif cmd == "/unblock":
         unblock(issue)
+    elif cmd == "/example":
+        save_example(issue, arg)
     elif cmd == "/rewrite":
         rewrite(cfg, issue, arg)
     else:
