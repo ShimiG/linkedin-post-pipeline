@@ -29,8 +29,21 @@ def tidy(text):
     t = re.sub(r"[ \t]+\n", "\n", t)
     if "\n\n" not in t and "\n" in t:                         # one paragraph per line -> blank line between
         t = t.replace("\n", "\n\n")
-    t = re.sub(r"(\S)[ \t]+((?:#\w+[ \t]*)+)$", r"\1\n\n\2", t)  # trailing hashtags glued to the last sentence -> own line
+    t = _hashtags_on_own_line(t)
     return re.sub(r"\n{3,}", "\n\n", t).strip()
+
+
+def _hashtags_on_own_line(t):
+    """'...think? #AI #LLM' at the very end -> '...think?' + blank line + '#AI #LLM'."""
+    head, _, last = t.rpartition("\n")
+    words = last.split()
+    n = 0
+    while n < len(words) and re.fullmatch(r"#\w+", words[-1 - n]):
+        n += 1
+    if n == 0 or n == len(words):
+        return t
+    fixed = " ".join(words[:-n]) + "\n\n" + " ".join(words[-n:])
+    return f"{head}\n{fixed}" if head else fixed
 
 
 def norm(tok):
