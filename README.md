@@ -1,6 +1,6 @@
 # LinkedIn post pipeline (GitHub Actions)
 
-Drafts a LinkedIn post three times a week from free sources, fact-checks it, translates it to Hebrew, and opens a GitHub issue for you to approve. The published post has the Hebrew first, then the English. Comment `/approve` and it is published on your personal profile. No server, no database, no paid services.
+Drafts a LinkedIn post three times a week from free sources, fact-checks it, translates it to Hebrew, and opens a GitHub issue for you to approve. The published post opens with a short Hebrew headline about the post and a `*English below` line, then the Hebrew text, then the English. Comment `/approve` and it is published on your personal profile. No server, no database, no paid services.
 
 ```
 schedule Mon/Wed/Fri ──▶ draft job
@@ -9,11 +9,11 @@ schedule Mon/Wed/Fri ──▶ draft job
                            │    coding fact ← a Wikipedia article from config.yml
                            ├─ Groq writes the post in your voice (Gemini as fallback)
                            ├─ guardrail: every number and outlet must be in the sources, no links, ≤ 3 hashtags
-                           ├─ Hebrew translation, checked: Hebrew script, no new numbers, no links or hashtags
+                           ├─ Hebrew translation + headline, checked: Hebrew script, no new numbers, no links or hashtags
                            └─ opens a `draft` issue  ──▶ you get a GitHub notification
 
 you comment on the issue ──▶ review job
-                           ├─ /approve          → one LinkedIn post (Hebrew, • • •, English) + source link as the first comment
+                           ├─ /approve          → one LinkedIn post (headline, *English below, Hebrew, • • •, English) + source link as the first comment
                            ├─ /reject           → closed; that story/article may come back after a 7-day cooldown
                            ├─ /block [site]     → closed; that story/article (or the whole website) is never used again
                            └─ /rewrite <ask>    → English rewritten and re-checked, translated again, issue updated
@@ -23,8 +23,8 @@ The issues are the whole system of record: what was drafted, which sources were 
 
 ## Using it
 - **Approve from your phone:** the GitHub mobile app notifies you about the new issue; reply `/approve`.
-- **Edit by hand:** edit the issue and change the Hebrew (`<!-- post-he:… -->`) or English (`<!-- post-en:… -->`) block, then `/approve`. What you approve is exactly what is posted: the Hebrew, a `• • •` line, then the English. Empty the Hebrew block to post English only.
-- **Bilingual on or off:** `config.yml` → `bilingual.enabled`. The separator line is `bilingual.separator`.
+- **Edit by hand:** edit the issue and change the Hebrew (`<!-- post-he:… -->`) or English (`<!-- post-en:… -->`) block, then `/approve`. What you approve is exactly what is posted: the Hebrew block (headline, `*English below`, Hebrew text), a `• • •` line, then the English. Empty the Hebrew block to post English only. The _italic_ notes in the issue are never posted.
+- **Bilingual on or off:** `config.yml` → `bilingual.enabled`. The headline is `bilingual.headline`, the line under it `bilingual.english_marker`, the separator `bilingual.separator`.
 - **Reject or block:** `/reject` drops just this post; its story or article can be drafted again after `review.reject_cooldown_days` (7). `/block` drops it and never uses that story or Wikipedia article again; `/block site` never uses that website again (news only). Both work on closed drafts too, and `/unblock` undoes them.
 - **Queue your own topic:** open an issue with the label `topic`. The title is the subject, the body is your notes (facts, the point you want to make). Queued topics go before automatic ones, oldest first, and get your full profile.
 - **Draft now:** Actions → *Draft a post* → *Run workflow* (choose `auto`, `news` or `fact`).

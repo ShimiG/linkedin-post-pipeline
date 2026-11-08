@@ -42,6 +42,17 @@ def bilingual(cfg):
     return bool(b.get("enabled")), str(b.get("language") or "Hebrew")
 
 
+def notes_of(out):
+    return [str(n) for n in out.get("notes") or [] if str(n).strip()]
+
+
+def hebrew_part(cfg, headline, body):
+    """What opens the post: the headline, the "*English below" line, a blank line, then the Hebrew text."""
+    marker = str((cfg.get("bilingual") or {}).get("english_marker") or "").strip()
+    top = f"{headline}\n{marker}" if marker else headline
+    return f"{top}\n\n{body}"
+
+
 def translate(cfg, english):
     """English post -> Hebrew, checked. Returns (hebrew, model, notes). Raises RuntimeError when no attempt passes."""
     L = cfg["llm"]
@@ -49,7 +60,10 @@ def translate(cfg, english):
     s = prompt_text("translate-prompt.md")
     system = s.split("<!-- TRANSLATE PROMPT START -->", 1)[1].split("<!-- TRANSLATE PROMPT END -->", 1)[0].strip()
     system = system.replace("Hebrew", language)
+    headline_on = bool((cfg.get("bilingual") or {}).get("headline", True))
     base = "Translate this LinkedIn post:\n\n" + english
+    if not headline_on:
+        system += "\n\nheadline_he is not used: return an empty string for it."
     providers = [L["primary"], L["fallback"]]
     provider, note, last = providers[0], "", "no attempt made"
     for attempt in range(1, L["max_attempts"] + 1):
@@ -62,8 +76,13 @@ def translate(cfg, english):
             note = ""
             continue
         res = guardrail.check_translation(out.get("post_text_he", ""), english, today=today(cfg))
-        if res.ok:
-            return res.post_text, model, [str(n) for n in out.get("notes") or [] if str(n).strip()]
+        if res.ok and headline_on:
+            hres = guardrail.check_headline(out.get("headline_he", ""), english, today=today(cfg))
+            if hres.ok:
+                return hebrew_part(cfg, hres.post_text, res.post_text), model, notes_of(out)
+            res = hres
+        elif res.ok:
+            return res.post_text, model, notes_of(out)
         last = res.message
         print(f"translation attempt {attempt}: {res.message}")
         note = guardrail.translation_retry_note(res)
