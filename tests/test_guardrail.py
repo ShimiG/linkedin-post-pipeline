@@ -136,3 +136,9 @@ def test_headline_rules():
     assert guardrail.check_headline("מודל " * 30, EN_POST, today=TODAY).reason == "headline_too_long"
     r = guardrail.check_headline("שיפור פי 3 במודל", EN_POST, today=TODAY)
     assert "headline" in guardrail.translation_retry_note(r)
+
+
+def test_tidy_moves_trailing_hashtags_to_own_line():
+    assert guardrail.tidy("Body.\n\nWhat do you think? #AI #LLM") == "Body.\n\nWhat do you think?\n\n#AI #LLM"
+    assert guardrail.tidy("Body.\n\n#AI #LLM") == "Body.\n\n#AI #LLM"            # already on its own line
+    assert guardrail.tidy("I like #python a lot.") == "I like #python a lot."       # inline tag mid-sentence stays

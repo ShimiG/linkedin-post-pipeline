@@ -29,7 +29,8 @@ def tidy(text):
     t = re.sub(r"[ \t]+\n", "\n", t)
     if "\n\n" not in t and "\n" in t:                         # one paragraph per line -> blank line between
         t = t.replace("\n", "\n\n")
-    return re.sub(r"\n{3,}", "\n\n", t)
+    t = re.sub(r"(\S)[ \t]+((?:#\w+[ \t]*)+)$", r"\1\n\n\2", t)  # trailing hashtags glued to the last sentence -> own line
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
 
 
 def norm(tok):
