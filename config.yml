@@ -22,7 +22,11 @@ post:
   max_chars: 1300              # LinkedIn allows 3000; short posts read better
   max_hashtags: 3
   signature: ""                # optional fixed last line, appended if missing, excluded from checks
-  source_link_as_comment: true # links in the post body cut reach, so the source goes in the first comment
+  # Links in the post body cut reach, so the source belongs in the first comment.
+  #   manual: after publishing, the issue tells you the link to paste as the first comment (works with any app)
+  #   auto:   the bot comments it via the API (needs LinkedIn's partner-only Community Management API; self-serve apps get 403)
+  #   off:    no source link
+  source_link: manual
 
 # Each post is written in English, translated, and published as one post: translation first, then the English.
 bilingual:

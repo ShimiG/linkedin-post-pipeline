@@ -162,7 +162,7 @@ def render_draft(topic, news_items, draft, extra_warnings=()):
     if draft.facts_used:
         lines += ["<details><summary>Facts used</summary>", ""] + [f"- {f}" for f in draft.facts_used] + ["", "</details>", ""]
     if src:
-        lines += [f"**First comment** (posted under the post): Source: {src}", ""]
+        lines += [f"**Source link for the first comment:** {src} (after `/approve`, the bot tells you where to paste it)", ""]
     lines += ["---", "Reply with **`/approve`** to publish, **`/reject`** to drop this post, **`/block`** to drop it and never use this source again"
               + (" (**`/block site`** for the whole website)" if topic["kind"] == "news" else "")
               + ", or **`/rewrite <what to change>`** for an AI rewrite"

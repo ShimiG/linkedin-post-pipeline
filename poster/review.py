@@ -33,24 +33,38 @@ def approve(cfg, issue):
         return gh.comment(n, f":x: The post is {len(post)} characters; LinkedIn allows {LINKEDIN_MAX}. Shorten it and `/approve` again.")
     meta = gh.parse_meta(issue.get("body"))
     src = meta.get("topic", {}).get("source_url")
-    first_comment = f"Source: {src}" if src and cfg["post"].get("source_link_as_comment", True) else None
+    mode = source_link_mode(cfg) if src else "off"
+    link_line = f"Source: {src}"
 
     if cfg["publish_mode"] != "linkedin":
         gh.comment(n, "**Simulated** (publish_mode is `simulated`), nothing was posted. This is what would go out:\n\n"
-                   + "\n".join("> " + l for l in post.splitlines()) + (f"\n\nFirst comment: {first_comment}" if first_comment else "")
+                   + "\n".join("> " + l for l in post.splitlines())
+                   + (f"\n\nFirst comment ({'by the bot' if mode == 'auto' else 'you add it'}): {link_line}" if mode != "off" else "")
                    + "\n\nSet the repo variable `PUBLISH_MODE` to `linkedin` to post for real.")
         gh.add_labels(n, ["simulated"])
         return gh.close(n)
     try:
-        urn, url, comment_error = linkedin.publish(post, first_comment)
+        urn, url, comment_error = linkedin.publish(post, link_line if mode == "auto" else None)
     except linkedin.LinkedInError as e:
         return gh.comment(n, f":x: Not published: {e}\n\nFix it and comment `/approve` again.")
     msg = f":rocket: Published: {url or urn}"
-    if comment_error:
-        msg += f"\n\n:warning: The source comment could not be added ({comment_error}). Add it by hand if you want it: {src}"
+    if mode == "manual" or (mode == "auto" and comment_error):
+        why = f"The bot could not add it ({comment_error}). " if comment_error else ""
+        msg += (f"\n\n:link: **Add the source as the first comment** on [your post]({url}). {why}Paste this:\n\n"
+                f"```\n{link_line}\n```")
     gh.comment(n, msg)
     gh.add_labels(n, ["published"])
     gh.close(n)
+
+
+def source_link_mode(cfg):
+    post = cfg.get("post") or {}
+    mode = str(post.get("source_link") or "").strip().lower()
+    if mode in ("manual", "auto", "off"):
+        return mode
+    if "source_link_as_comment" in post:  # older config key
+        return "auto" if post["source_link_as_comment"] else "off"
+    return "manual"
 
 
 def reject(cfg, issue):
