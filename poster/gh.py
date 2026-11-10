@@ -20,7 +20,7 @@ LABELS = {
     "published": ("5319e7", "Posted to LinkedIn"),
     "simulated": ("c5def5", "Approved in simulated mode, nothing was posted"),
     "rejected": ("b60205", "Rejected, never posted; the source may be drafted again after the cooldown"),
-    "blocked": ("000000", "This story or Wikipedia article is never drafted again (/unblock to undo)"),
+    "blocked": ("000000", "This story, Wikipedia article or event is never drafted again (/unblock to undo)"),
     "blocked-site": ("3f3f3f", "Stories from this website are never drafted again (/unblock to undo)"),
     "token-expiry": ("fbca04", "LinkedIn token needs renewing"),
     "example": ("d4c5f9", "A post you like: saved to examples/ as a writing example"),
@@ -146,7 +146,7 @@ def post_section(he, en):
 
 
 def render_draft(topic, news_items, draft, extra_warnings=()):
-    kind_label = {"news": "AI news", "fact": "Coding fact", "queued": "Your topic"}[topic["kind"]]
+    kind_label = {"news": "AI news", "fact": "Coding fact", "onthisday": "On this day", "queued": "Your topic"}[topic["kind"]]
     src = topic.get("source_url")
     head = [f"**{kind_label}**", f"model `{draft.model}` (attempt {draft.attempt})", f"{draft.words} words (English)"]
     if draft.post_text_he:

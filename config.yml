@@ -2,10 +2,10 @@
 # Repo variables override a few of these without a commit: PUBLISH_MODE, TIMEZONE.
 
 publish_mode: simulated        # simulated = /approve only shows what would be posted. Set to "linkedin" (or repo variable PUBLISH_MODE) to go live.
-timezone: UTC                  # used for "today" in prompts; override with repo variable TIMEZONE
+timezone: UTC                  # used for "today" in prompts and for which date "On this day" looks up; override with repo variable TIMEZONE
 
 # Order the automatic post kinds rotate through when no `topic` issue is waiting.
-rotation: [news, fact]
+rotation: [news, fact, onthisday]
 
 llm:
   primary: groq
@@ -43,7 +43,68 @@ news:
   queries: [AI, LLM, OpenAI, Anthropic, Claude, Gemini, GPT, "machine learning", "AI agents", "open source model"]
   max_candidates: 8            # stories tried, best first, until one has a readable article
 
-# Profile keys given to news and fact posts (your own topics get the whole profile).
+# "On this day" posts: something that happened on today's date in an earlier year, from Wikipedia's On this day list.
+# Only entries that match a keyword are used; on a date with no match the run moves on to the next kind in the rotation.
+on_this_day:
+  sections: [selected, events, births, deaths]   # which lists to read; on equal relevance, earlier ones win
+  min_score: 1                 # a keyword in the event line counts 2, in a linked article's title or description 1
+  min_years_ago: 1
+  max_candidates: 5            # events tried, most relevant first, until one has enough background text
+  # Whole words, plurals included. ALL-CAPS ones (AI, IBM) must match exactly; the rest ignore case.
+  keywords:
+    - computer
+    - computing
+    - computer scientist
+    - computer science
+    - software
+    - programmer
+    - programming
+    - programming language
+    - algorithm
+    - operating system
+    - database
+    - compiler
+    - open source
+    - open-source
+    - artificial intelligence
+    - machine learning
+    - neural network
+    - chatbot
+    - robot
+    - robotics
+    - internet
+    - World Wide Web
+    - web browser
+    - search engine
+    - email
+    - microprocessor
+    - transistor
+    - integrated circuit
+    - semiconductor
+    - supercomputer
+    - mainframe
+    - personal computer
+    - smartphone
+    - video game
+    - cryptography
+    - cryptographer
+    - hacker
+    - computer virus
+    - AI
+    - IBM
+    - ARPANET
+    - ENIAC
+    - Microsoft
+    - Apple Inc.
+    - Google
+    - Intel
+    - Linux
+    - Unix
+    - Macintosh
+    - iPhone
+    - Wikipedia
+
+# Profile keys given to news, fact and "On this day" posts (your own topics get the whole profile).
 general_post_profile_keys: [name, headline, focus, daily_tools]
 
 examples:

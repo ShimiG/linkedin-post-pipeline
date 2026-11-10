@@ -1,4 +1,4 @@
-"""Free, keyless sources: Hacker News (Algolia search API) for AI news, Wikipedia for coding facts."""
+"""Free, keyless sources: Hacker News (Algolia search API) for AI news, Wikipedia for coding facts and "On this day" events."""
 import html
 import random
 import re
@@ -11,6 +11,10 @@ from .http import HttpError, get_json, request
 
 HN_SEARCH = "https://hn.algolia.com/api/v1/search"
 WIKI_API = "https://en.wikipedia.org/w/api.php"
+# Wikipedia's "On this day" feed: {selected, events, births, deaths, holidays}, each entry {text, year, pages:[summary]}.
+ONTHISDAY_FEEDS = ("https://en.wikipedia.org/api/rest_v1/feed/onthisday/all/{mm:02d}/{dd:02d}",
+                   "https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/all/{mm:02d}/{dd:02d}")
+ONTHISDAY_SECTIONS = ("selected", "events", "births", "deaths")   # in order of preference on equal relevance
 ARTICLE_MAX_CHARS = 2500
 
 
@@ -151,5 +155,123 @@ def pick_fact(cfg, used_titles, rng=random, blocked=()):
         item = {"title": w["title"], "source": "wikipedia.org", "date": "", "snippet": w["extract"], "url": w["url"]}
         topic = {"kind": "fact", "title": w["title"], "category": "coding_fact", "angle": "", "wiki_subject": s,
                  "source_url": w["url"]}
+        return topic, [item]
+    return None
+
+
+# --------------------------------------------------------------------------- Wikipedia "On this day"
+def keyword_hits(keywords, text):
+    """Keywords found in text as whole words. ALL-CAPS keywords (AI, IBM) must match exactly; the rest ignore case
+    and also match their plural ("computer" finds "computers")."""
+    hits = set()
+    for kw in keywords:
+        kw = str(kw).strip()
+        if not kw:
+            continue
+        exact = kw.isupper()
+        pattern = rf"(?<![A-Za-z0-9]){re.escape(kw)}{'' if exact else 's?'}(?![A-Za-z0-9])"
+        if re.search(pattern, text or "", 0 if exact else re.I):
+            hits.add(kw.lower())
+    return hits
+
+
+def _page(pg):
+    title = pg.get("normalizedtitle") or (pg.get("titles") or {}).get("normalized") or str(pg.get("title", "")).replace("_", " ")
+    url = ((pg.get("content_urls") or {}).get("desktop") or {}).get("page") or ""
+    if not url and title:
+        url = "https://en.wikipedia.org/wiki/" + urllib.parse.quote(title.replace(" ", "_"))
+    return {"title": title, "description": str(pg.get("description") or ""), "extract": str(pg.get("extract") or "").strip(), "url": url}
+
+
+def onthisday_feed(day):
+    """Wikipedia's lists for this month and day; {} when neither host answers."""
+    for tpl in ONTHISDAY_FEEDS:
+        try:
+            data = get_json(tpl.format(mm=day.month, dd=day.day), timeout=20)
+        except (HttpError, OSError) as e:
+            print(f"on-this-day feed failed: {e}")
+            continue
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def onthisday_candidates(cfg, day, used_ids=(), feed=None):
+    """Events, births and deaths on this month/day that match on_this_day.keywords, most relevant first.
+
+    Relevance: keywords in the event line count double, keywords in the linked articles' titles and short
+    descriptions count once. The article the keywords point to is the main one: the source link and most of the background.
+    """
+    o = cfg["on_this_day"]
+    feed = onthisday_feed(day) if feed is None else feed
+    sections = [s for s in (o.get("sections") or ONTHISDAY_SECTIONS) if s in ONTHISDAY_SECTIONS]
+    out, seen = [], set()
+    for rank, section in enumerate(sections):
+        for e in feed.get(section) or []:
+            text, year = re.sub(r"\s+", " ", str(e.get("text") or "")).strip(), e.get("year")
+            if not text or not isinstance(year, int) or not 0 < year < day.year:
+                continue
+            years_ago = day.year - year
+            if years_ago < int(o.get("min_years_ago", 1)):
+                continue
+            pages = [p for p in map(_page, e.get("pages") or []) if p["title"]]
+            in_text = keyword_hits(o["keywords"], text)
+            per_page = [keyword_hits(o["keywords"], f"{p['title']}. {p['description']}") for p in pages]
+            score = 2 * len(in_text) + len(set().union(*per_page) - in_text)
+            if score < int(o.get("min_score", 1)):
+                continue
+            # A birth or death is about its one person; an event's main article is the one the keywords point at.
+            main = pages[0] if pages else None
+            if pages and section in ("selected", "events"):
+                main = pages[max(range(len(pages)), key=lambda i: (len(per_page[i]), -i))]
+            oid = f"{day.month:02d}-{day.day:02d}/{year}/{main['title'] if main else text[:60]}"
+            if oid in used_ids or oid in seen:
+                continue  # "selected" repeats entries of "events"
+            seen.add(oid)
+            what = {"births": f"{text} was born", "deaths": f"{text} died"}.get(section, text)
+            out.append({"otd_id": oid, "section": section, "year": year, "years_ago": years_ago, "text": what,
+                        "page": main, "others": [p for p in pages if p is not main], "score": score, "rank": rank})
+    out.sort(key=lambda c: (-c["score"], c["rank"], -c["year"]))
+    return out[: int(o.get("max_candidates", 5))]
+
+
+def _clip(text, limit):
+    text = re.sub(r"\s+", " ", text or "").strip()
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "…"
+
+
+def onthisday_background(c):
+    """(text, url): the main article at length, then the opening of up to two other linked articles for context."""
+    main = c["page"]
+    if not main:
+        return "", ""
+    try:
+        w = wiki_intro(main["title"])
+    except (HttpError, OSError) as e:
+        print(f"wikipedia {main['title']!r} failed: {e}")
+        w = None
+    parts = [(main["title"], _clip((w or {}).get("extract") or main["extract"], 900))]
+    parts += [(p["title"], _clip(p["extract"], 250)) for p in c["others"][:2]]
+    text = "\n".join(f"{title}: {body}" for title, body in parts if body)
+    return text, (w or {}).get("url") or main["url"]
+
+
+def pick_onthisday(cfg, used_ids, day):
+    """The most relevant event on this date with enough background text. Returns (topic, news_items) or None."""
+    for c in onthisday_candidates(cfg, day, used_ids):
+        background, url = onthisday_background(c)
+        snippet = f"On {day.day} {day.strftime('%B')} {c['year']}: {c['text']}"
+        if background:
+            snippet += f"\n\nBackground from Wikipedia.\n{background}"
+        if len(snippet) < 200:
+            print(f"skip on-this-day {c['otd_id']}: only {len(snippet)} chars of source text")
+            continue
+        event_date = f"{c['year']:04d}-{day.month:02d}-{day.day:02d}"
+        title = f"On this day in {c['year']}: {c['text']}"
+        item = {"title": title, "source": "wikipedia.org", "date": event_date, "snippet": snippet[:ARTICLE_MAX_CHARS],
+                "years_ago": c["years_ago"], "url": url}
+        topic = {"kind": "onthisday", "title": title if len(title) <= 140 else title[:137].rstrip() + "...",
+                 "category": "on_this_day", "angle": "", "otd_id": c["otd_id"], "otd_date": day.isoformat(),
+                 "source_url": url}
         return topic, [item]
     return None

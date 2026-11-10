@@ -9,7 +9,7 @@ on:
       kind:
         description: "What to draft"
         type: choice
-        options: [auto, news, fact]
+        options: [auto, news, fact, onthisday]
         default: auto
 
 permissions:
