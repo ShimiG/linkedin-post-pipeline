@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import urllib.parse
+from datetime import datetime
 
 from .http import HttpError, request
 
@@ -14,11 +15,14 @@ HE_START, HE_END = "<!-- post-he:start -->", "<!-- post-he:end -->"       # tran
 EN_START, EN_END = "<!-- post-en:start -->", "<!-- post-en:end -->"
 SECTION_START, SECTION_END = "<!-- post-section:start -->", "<!-- post-section:end -->"  # wraps the blocks + headings
 META_RE = re.compile(r"<!-- meta: (\{.*?\}) -->", re.S)
+PUBLISH_AT_RE = re.compile(r"\n*<!-- publish-at: (\S+) -->")                # set by /schedule, read by poster.scheduled
+SCHEDULED_WORKFLOW = "scheduled.yml"
 LABELS = {
-    "draft": ("0e8a16", "A post draft waiting for /approve, /reject or /rewrite"),
+    "draft": ("0e8a16", "A post draft waiting for /approve, /schedule, /reject or /rewrite"),
     "topic": ("1d76db", "A post idea you queued; drafted before automatic topics"),
     "published": ("5319e7", "Posted to LinkedIn"),
     "simulated": ("c5def5", "Approved in simulated mode, nothing was posted"),
+    "scheduled": ("bfd4f2", "Approved for later: published at the time given to /schedule"),
     "rejected": ("b60205", "Rejected, never posted; the source may be drafted again after the cooldown"),
     "blocked": ("000000", "This story, Wikipedia article or event is never drafted again (/unblock to undo)"),
     "blocked-site": ("3f3f3f", "Stories from this website are never drafted again (/unblock to undo)"),
@@ -109,6 +113,11 @@ def close(number, reason="completed"):
     return update_issue(number, state="closed", state_reason=reason)
 
 
+def set_workflow(name, enabled):
+    """Switch a workflow on or off (needs `actions: write`). The scheduled publisher only runs while a post is waiting."""
+    return call("PUT", f"/actions/workflows/{name}/{'enable' if enabled else 'disable'}")
+
+
 # --------------------------------------------------------------------------- issue body <-> data
 def parse_meta(body):
     m = META_RE.search(body or "")
@@ -118,6 +127,24 @@ def parse_meta(body):
         return json.loads(m.group(1))
     except json.JSONDecodeError:
         return {}
+
+
+def publish_at(body):
+    """The time a draft is scheduled for (aware datetime), or None."""
+    m = PUBLISH_AT_RE.search(body or "")
+    if not m:
+        return None
+    try:
+        when = datetime.fromisoformat(m.group(1))
+    except ValueError:
+        return None
+    return when if when.tzinfo else None
+
+
+def with_publish_at(body, when):
+    """The issue body with its schedule set to `when`, or removed when `when` is None."""
+    body = PUBLISH_AT_RE.sub("", body or "").rstrip()
+    return f"{body}\n\n<!-- publish-at: {when.isoformat(timespec='minutes')} -->" if when else body
 
 
 def _between(body, start, end):
@@ -163,7 +190,7 @@ def render_draft(topic, news_items, draft, extra_warnings=()):
         lines += ["<details><summary>Facts used</summary>", ""] + [f"- {f}" for f in draft.facts_used] + ["", "</details>", ""]
     if src:
         lines += [f"**Source link for the first comment:** {src} (after `/approve`, the bot tells you where to paste it)", ""]
-    lines += ["---", "Reply with **`/approve`** to publish, **`/reject`** to drop this post, **`/block`** to drop it and never use this source again"
+    lines += ["---", "Reply with **`/approve`** to publish, **`/schedule dd/mm/yyyy HH:MM`** to publish at that time, **`/reject`** to drop this post, **`/block`** to drop it and never use this source again"
               + (" (**`/block site`** for the whole website)" if topic["kind"] == "news" else "")
               + ", or **`/rewrite <what to change>`** for an AI rewrite"
               + (" (the English is rewritten, then translated again)." if draft.post_text_he else "."), ""]

@@ -18,6 +18,7 @@ you comment on the issue ──▶ review job
                            ├─ /approve          → one LinkedIn post (headline, *English below, Hebrew, • • •, English);
                            │                       the issue then gives you the source link to paste as the first comment
                            │                       (an "On this day" post approved on another date needs /approve anyway)
+                           ├─ /schedule dd/mm/yyyy HH:MM → the same as /approve, but at that time (/unschedule cancels)
                            ├─ /reject           → closed; that story/article may come back after a 7-day cooldown
                            ├─ /block [site]     → closed; that story/article (or the whole website) is never used again
                            └─ /rewrite <ask>    → English rewritten and re-checked, translated again, issue updated
@@ -27,6 +28,7 @@ The issues are the whole system of record: what was drafted, which sources were 
 
 ## Using it
 - **Approve from your phone:** the GitHub mobile app notifies you about the new issue; reply `/approve`.
+- **Publish later:** reply `/schedule 25/12/2026 09:30` (day/month/year, 24-hour clock, in your `TIMEZONE`). It is a delayed `/approve`: the draft gets the `scheduled` label, and the *Publish scheduled posts* workflow posts it with its first check after that time (checks run every 15 minutes, so allow up to about 20 minutes). What is posted is the text in the issue at that moment, so you can keep editing. `/unschedule` cancels, `/schedule` with a new time moves it, `/approve` publishes right away, `/reject` drops it. If publishing fails at that time (an expired token, say), the issue tells you and the schedule is cancelled, it does not retry on its own.
 - **Edit by hand:** edit the issue and change the Hebrew (`<!-- post-he:… -->`) or English (`<!-- post-en:… -->`) block, then `/approve`. What you approve is exactly what is posted: the Hebrew block (headline, `*English below`, Hebrew text), a `• • •` line, then the English. Empty the Hebrew block to post English only. The _italic_ notes in the issue are never posted.
 - **Bilingual on or off:** `config.yml` → `bilingual.enabled`. The headline is `bilingual.headline`, the line under it `bilingual.english_marker`, the separator `bilingual.separator`.
 - **Reject or block:** `/reject` drops just this post; its story or article can be drafted again after `review.reject_cooldown_days` (7). `/block` drops it and never uses that story, Wikipedia article or event again; `/block site` never uses that website again (news only). Both work on closed drafts too, and `/unblock` undoes them.
@@ -59,7 +61,7 @@ gh secret set LINKEDIN_ACCESS_TOKEN
 gh secret set PROFILE_YML < profile.yml
 gh variable set LINKEDIN_TOKEN_EXPIRES --body 2027-01-08   # the date 60 days after you generated the token
 ```
-Optional variables: `PUBLISH_MODE` (`simulated` by default, set to `linkedin` to post for real) and `TIMEZONE` (for "today" in prompts and "On this day", e.g. `Europe/London`).
+Optional variables: `PUBLISH_MODE` (`simulated` by default, set to `linkedin` to post for real) and `TIMEZONE` (for "today" in prompts and "On this day", and the clock `/schedule` times are read in, e.g. `Europe/London`).
 
 ### 5. Try it
 1. Actions → *Draft a post* → *Run workflow*. A `draft` issue appears within a minute.
@@ -79,6 +81,7 @@ Links inside a post cut its reach, so the source goes in the first comment. Link
 ## Costs and limits
 - GitHub Actions: each run takes about a minute; the free plan includes 2,000 minutes a month.
 - Hacker News search and Wikipedia (articles and the "On this day" feed): free, no key. Groq and Gemini: free tiers, a few calls per week.
+- *Publish scheduled posts* is switched on by `/schedule` and switches itself off when no draft is waiting, so it shows as **disabled** in the Actions tab most of the time. That is normal. While a post is waiting it runs every 15 minutes, about 100 Actions minutes per waiting day; to spend less, make the cron in `.github/workflows/scheduled.yml` less frequent.
 - Scheduled runs can start a few minutes late. If a scheduled run never fires, check the Actions tab for a disabled-workflow notice.
 
 ## Rule zero
