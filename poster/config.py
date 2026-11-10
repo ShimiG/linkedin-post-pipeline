@@ -2,7 +2,7 @@
 import os
 import pathlib
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
@@ -17,6 +17,11 @@ def load_config():
         cfg["timezone"] = os.environ["TIMEZONE"].strip()
     if cfg["publish_mode"] not in ("simulated", "linkedin"):
         raise SystemExit(f"publish_mode must be simulated or linkedin, got {cfg['publish_mode']!r}")
+    try:
+        tz(cfg)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        raise SystemExit(f"timezone must be a region name such as Asia/Jerusalem or Europe/London, got {cfg['timezone']!r} "
+                         "(config.yml, or the repo variable TIMEZONE). Offsets like GMT+2 are not accepted.") from None
     return cfg
 
 
