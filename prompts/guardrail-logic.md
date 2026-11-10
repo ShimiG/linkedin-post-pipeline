@@ -28,6 +28,8 @@ Not failures, just review notes on the issue: the model's own warnings, and Link
 
 An "On this day" draft is tied to its date: `/approve` on any other month and day posts nothing and asks for `/approve anyway`, so a stale "on this day" is never published by accident.
 
+`/schedule dd/mm/yyyy HH:MM` is a delayed `/approve`: it checks the time (valid, in the future), the post (present, at most 3000 characters) and, for an "On this day" draft, that the day matches. At the scheduled time the draft is first taken off the schedule and then published, so a failure is reported once and never retried, and a post cannot go out twice.
+
 `/approve` does not re-run these checks: what you approve is what gets posted (Hebrew, separator, English), after a 3000-character limit check on the combined text. Edit the text by hand freely.
 
 `post.signature` (optional, default empty): a fixed last line, appended if missing and excluded from all checks.

@@ -32,8 +32,12 @@ def load_profile():
     return {str(k): (", ".join(map(str, v)) if isinstance(v, list) else str(v)).strip() for k, v in data.items() if v}
 
 
+def tz(cfg):
+    return ZoneInfo(cfg.get("timezone") or "UTC")
+
+
 def today(cfg):
-    return datetime.now(ZoneInfo(cfg.get("timezone") or "UTC")).date()
+    return datetime.now(tz(cfg)).date()
 
 
 def prompt_text(name):
