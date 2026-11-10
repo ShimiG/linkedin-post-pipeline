@@ -2,7 +2,7 @@
 
 Cheap, explainable checks that run on every draft and every `/rewrite` before it reaches the issue. No second LLM call.
 
-Allowed facts come from: the profile keys given to the model, the topic title and angle, every field of every source item (title, snippet, date, discussion line), and today's year, month and day.
+Allowed facts come from: the profile keys given to the model, the topic title and angle, every field of every source item (title, snippet, date, discussion line, and for "On this day" posts `years_ago`), and today's year, month and day.
 
 Checks, in order (the first failure wins; each failure is retried up to `llm.max_attempts` with the offending items named in the prompt):
 1. `llm_error`: provider error, non-JSON answer, or empty `post_text`. The next attempt switches provider (Groq and Gemini).
@@ -25,6 +25,8 @@ The Hebrew headline (`check_headline`) gets the same checks, plus: present, one 
 If no translation passes, the draft still opens with the English only and a review note; `/rewrite` tries again.
 
 Not failures, just review notes on the issue: the model's own warnings, and LinkedIn token expiry.
+
+An "On this day" draft is tied to its date: `/approve` on any other month and day posts nothing and asks for `/approve anyway`, so a stale "on this day" is never published by accident.
 
 `/approve` does not re-run these checks: what you approve is what gets posted (Hebrew, separator, English), after a 3000-character limit check on the combined text. Edit the text by hand freely.
 

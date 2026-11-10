@@ -1,12 +1,13 @@
-"""Runs when the repo owner comments on a `draft` issue: /approve, /reject, /rewrite <instruction>.
+"""Runs when the repo owner comments on a `draft` issue: /approve [anyway], /reject, /rewrite <instruction>.
 
 Inputs come from the workflow as env vars (never interpolated into shell): ISSUE_NUMBER, COMMENT_BODY.
 """
 import os
 import sys
+from datetime import date
 
 from . import compose, examples, gh, linkedin, sources
-from .config import load_config, load_profile
+from .config import load_config, load_profile, today
 from .draft import author_for
 
 LINKEDIN_MAX = 3000
@@ -21,10 +22,26 @@ def parse_command(text):
     return cmd.lower(), arg.strip()
 
 
-def approve(cfg, issue):
+def off_date(cfg, topic):
+    """The date an "On this day" draft was written for, when that is not today's month and day; else ''."""
+    if topic.get("kind") != "onthisday" or not topic.get("otd_date"):
+        return ""
+    try:
+        d = date.fromisoformat(topic["otd_date"])
+    except ValueError:
+        return ""
+    t = today(cfg)
+    return "" if (d.month, d.day) == (t.month, t.day) else f"{d.day} {d.strftime('%B')}"
+
+
+def approve(cfg, issue, arg=""):
     n, labels = issue["number"], {l["name"] for l in issue.get("labels", [])}
     if "published" in labels:
         return gh.comment(n, "Already published, nothing to do.")
+    written_for = off_date(cfg, gh.parse_meta(issue.get("body")).get("topic", {}))
+    if written_for and arg.lower() != "anyway":
+        return gh.comment(n, f":calendar: This is an \"On this day\" post written for {written_for}, and that is not today. "
+                          "Nothing was posted. Edit the opening so it is still true and comment **`/approve anyway`**, or **`/reject`**.")
     he, en = gh.parse_parts(issue.get("body"))
     post = compose.combine(cfg, he, en)
     if not post:
@@ -82,7 +99,7 @@ def block(issue, arg):
     labels = ["blocked"]
     if arg == "site":
         if topic.get("kind") != "news" or not topic.get("source_url"):
-            return gh.comment(n, "`/block site` only works on news drafts (fact posts all come from Wikipedia). Use **`/block`** to block just this article.")
+            return gh.comment(n, "`/block site` only works on news drafts (the other posts all come from Wikipedia). Use **`/block`** to block just this article or event.")
         labels.append("blocked-site")
     elif arg:
         return gh.comment(n, "Use **`/block`** for this story or article, or **`/block site`** for its whole website.")
@@ -146,7 +163,7 @@ def main():
         print("closed draft: only /block, /unblock and /example apply, ignoring")
         return
     if cmd == "/approve":
-        approve(cfg, issue)
+        approve(cfg, issue, arg)
     elif cmd == "/reject":
         reject(cfg, issue)
     elif cmd == "/block":

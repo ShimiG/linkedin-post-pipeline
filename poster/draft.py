@@ -1,7 +1,7 @@
 """Scheduled job: pick a topic, draft a post, open a `draft` issue for review.
 
     python -m poster.draft                 # what the schedule runs
-    DRAFT_KIND=fact python -m poster.draft # force a kind: auto | news | fact
+    DRAFT_KIND=fact python -m poster.draft # force a kind: auto | news | fact | onthisday
     DRY_RUN=1 python -m poster.draft       # print the issue instead of creating it
 """
 import os
@@ -12,6 +12,7 @@ from . import compose, gh, sources
 from .config import load_config, load_profile, today
 
 DRY = os.environ.get("DRY_RUN") == "1"
+KINDS = ("news", "fact", "onthisday")   # the automatic kinds config.yml -> rotation may list
 
 
 class History:
@@ -23,11 +24,11 @@ class History:
     """
 
     def __init__(self, issues, cooldown_days, now):
-        self.skip_hn, self.skip_wiki, self.blocked_wiki, self.blocked_sites, kinds = set(), set(), set(), set(), []
+        self.skip_hn, self.skip_wiki, self.skip_otd, self.blocked_wiki, self.blocked_sites, kinds = set(), set(), set(), set(), set(), []
         for i in issues:
             labels = {l["name"] for l in i.get("labels", [])}
             t = gh.parse_meta(i.get("body")).get("topic", {})
-            if t.get("kind") in ("news", "fact"):
+            if t.get("kind") in KINDS:
                 kinds.append(t["kind"])  # newest first
             if "blocked-site" in labels and t.get("source_url"):
                 self.blocked_sites.add(sources.host(t["source_url"]))
@@ -44,6 +45,8 @@ class History:
                 self.skip_hn.add(str(t["hn_id"]))
             if skip and t.get("wiki_subject"):
                 self.skip_wiki.add(t["wiki_subject"])
+            if skip and t.get("otd_id"):
+                self.skip_otd.add(t["otd_id"])
         self.last_kind = kinds[0] if kinds else None
 
 
@@ -63,10 +66,21 @@ def next_queued():
 
 def kind_order(cfg, last, forced):
     rot = cfg["rotation"]
-    if forced in rot:
+    if forced in KINDS:  # a forced kind runs first even when it is not in the rotation
         return [forced] + [k for k in rot if k != forced]
     start = (rot.index(last) + 1) % len(rot) if last in rot else 0
     return rot[start:] + rot[:start]
+
+
+def pick(cfg, h, kind):
+    if kind == "news":
+        return sources.pick_news(cfg, h.skip_hn, h.blocked_sites)
+    if kind == "onthisday":
+        return sources.pick_onthisday(cfg, h.skip_otd, today(cfg))
+    if kind == "fact":
+        return sources.pick_fact(cfg, h.skip_wiki, blocked=h.blocked_wiki)
+    print(f"unknown kind {kind!r} in rotation, skipping")
+    return None
 
 
 def author_for(cfg, profile, kind):
@@ -109,17 +123,19 @@ def main():
         picked = (queued, [])
     else:
         for kind in kind_order(cfg, h.last_kind, forced):
-            picked = (sources.pick_news(cfg, h.skip_hn, h.blocked_sites) if kind == "news"
-                      else sources.pick_fact(cfg, h.skip_wiki, blocked=h.blocked_wiki))
+            picked = pick(cfg, h, kind)
             if picked:
                 break
             print(f"no usable {kind} source this run, trying the next kind")
     if not picked:
-        sys.exit("no topic could be sourced (no queued topic, no readable news, no Wikipedia article)")
+        sys.exit("no topic could be sourced (no queued topic, no readable news, no Wikipedia article, no relevant event on this date)")
     topic, news = picked
     print(f"topic: [{topic['kind']}] {topic['title']}")
 
     extra = token_warnings(cfg)
+    if topic["kind"] == "onthisday":
+        d = date.fromisoformat(topic["otd_date"])
+        extra.append(f"This post is tied to {d.day} {d.strftime('%B')}. Approve it that day; after it, `/approve` asks you to confirm.")
     if topic["kind"] == "queued" and not profile:
         extra.append("Your topic was drafted without a profile, so the model only had the title and notes.")
     try:
