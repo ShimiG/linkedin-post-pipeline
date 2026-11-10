@@ -1,8 +1,8 @@
 # Pipeline settings. Secrets (API keys, LinkedIn token, your profile) are NOT here: they are GitHub repo secrets.
 # Repo variables override a few of these without a commit: PUBLISH_MODE, TIMEZONE.
 
-publish_mode: simulated        # simulated = /approve only shows what would be posted. Set to "linkedin" (or repo variable PUBLISH_MODE) to go live.
-timezone: UTC                  # "today" in prompts, the date "On this day" looks up, and the clock /schedule times are read in; override with repo variable TIMEZONE
+publish_mode: linkedin        # simulated = /approve only shows what would be posted. Set to "linkedin" (or repo variable PUBLISH_MODE) to go live.
+timezone: GMT+2                  # "today" in prompts, the date "On this day" looks up, and the clock /schedule times are read in; override with repo variable TIMEZONE
 
 # Order the automatic post kinds rotate through when no `topic` issue is waiting.
 rotation: [news, fact, onthisday]
