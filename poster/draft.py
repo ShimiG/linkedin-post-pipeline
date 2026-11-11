@@ -1,7 +1,8 @@
 """Scheduled job: pick a topic, draft a post, open a `draft` issue for review.
 
     python -m poster.draft                 # what the schedule runs
-    DRAFT_KIND=fact python -m poster.draft # force a kind: auto | news | fact | onthisday
+    DRAFT_KIND=fact python -m poster.draft # force a kind: auto | news | fact | onthisday | project
+    DRAFT_KIND=project PROJECT_REPO=youtube-music python -m poster.draft   # a post about one of your repos (empty = random)
     DRY_RUN=1 python -m poster.draft       # print the issue instead of creating it
 """
 import os
@@ -13,6 +14,7 @@ from .config import load_config, load_profile, today
 
 DRY = os.environ.get("DRY_RUN") == "1"
 KINDS = ("news", "fact", "onthisday")   # the automatic kinds config.yml -> rotation may list
+MANUAL_KINDS = ("project",)             # only when you ask for them (Run workflow -> kind); never picked automatically
 
 
 class History:
@@ -26,6 +28,7 @@ class History:
     def __init__(self, issues, cooldown_days, now):
         self.skip_hn, self.skip_wiki, self.skip_otd, self.blocked_wiki, self.blocked_sites, kinds = set(), set(), set(), set(), set(), []
         self.image_kinds = []  # newest first; drafts from before images have none and are left out
+        self.repo_drafted, self.blocked_repos = {}, set()  # project posts: repo -> newest draft time; repos never to pick at random
         for i in issues:
             labels = {l["name"] for l in i.get("labels", [])}
             img = gh.parse_image(i.get("body"))
@@ -34,6 +37,12 @@ class History:
             t = gh.parse_meta(i.get("body")).get("topic", {})
             if t.get("kind") in KINDS:
                 kinds.append(t["kind"])  # newest first
+            if t.get("repo"):
+                if "blocked" in labels:
+                    self.blocked_repos.add(t["repo"])
+                created = i.get("created_at")
+                when = datetime.fromisoformat(created.replace("Z", "+00:00")) if created else now
+                self.repo_drafted[t["repo"]] = max(when, self.repo_drafted.get(t["repo"], when))
             if "blocked-site" in labels and t.get("source_url"):
                 self.blocked_sites.add(sources.host(t["source_url"]))
             if "blocked" in labels or "blocked-site" in labels:
@@ -83,12 +92,20 @@ def pick(cfg, h, kind):
         return sources.pick_onthisday(cfg, h.skip_otd, today(cfg))
     if kind == "fact":
         return sources.pick_fact(cfg, h.skip_wiki, blocked=h.blocked_wiki)
+    if kind in MANUAL_KINDS:
+        print(f"{kind!r} posts are manual only (Run workflow -> kind); remove it from config.yml -> rotation")
+        return None
     print(f"unknown kind {kind!r} in rotation, skipping")
     return None
 
 
+def recent_repos(cfg, h, now):
+    days = int((cfg.get("projects") or {}).get("cooldown_days", 60))
+    return {r for r, when in h.repo_drafted.items() if (now - when).days < days}
+
+
 def author_for(cfg, profile, kind):
-    if kind == "queued":
+    if kind in ("queued", "project"):  # your own topics and projects get your whole profile
         return profile
     keys = cfg.get("general_post_profile_keys") or ["name", "headline"]
     return {k: v for k, v in profile.items() if k in keys}
@@ -145,6 +162,12 @@ def main():
     picked, queued = None, next_queued() if forced in ("auto", "") else None
     if queued:
         picked = (queued, [])
+    elif forced in MANUAL_KINDS:
+        owner = (cfg.get("projects") or {}).get("owner") or gh.repo().split("/")[0]
+        try:
+            picked = sources.pick_project(cfg, owner, os.environ.get("PROJECT_REPO", ""), recent_repos(cfg, h, datetime.now(timezone.utc)), h.blocked_repos)
+        except sources.ProjectError as e:
+            sys.exit(f"no project post: {e}")
     else:
         for kind in kind_order(cfg, h.last_kind, forced):
             picked = pick(cfg, h, kind)

@@ -8,6 +8,7 @@ schedule Mon/Wed/Fri ──▶ draft job
                            │    AI news     ← Hacker News (top AI story this week) + the article text
                            │    coding fact ← a Wikipedia article from config.yml
                            │    on this day ← Wikipedia's "On this day" list for today's date, tech events only
+                           │  (your project ← one of your GitHub repos: only when you run it by hand)
                            ├─ Groq writes the post in your voice (Gemini as fallback)
                            ├─ guardrail: every number and outlet must be in the sources, no links, ≤ 3 hashtags,
                            │    no article story retold as yours, no wording copied from your examples
@@ -37,8 +38,9 @@ The issues are the whole system of record: what was drafted, which sources were 
 - **Writing examples:** posts you like teach the drafts your style. Open an issue labelled `example` (title: why you like it, body: the post text), or comment `/example` on one of your own drafts. They are saved in `examples/`; each draft sees 3 of them as style references, never as facts, and a draft that copies 8 words in a row from one is rejected.
 - **On this day:** every third automatic post is about something that happened on today's date in an earlier year: an event, a birth or a death from Wikipedia's "On this day" list, with the linked articles as background. Only entries matching `config.yml` → `on_this_day.keywords` (computing and AI by default) are used; on a date with no match the run drafts the next kind instead. The draft is tied to its date: approve it the same day. On a later day `/approve` posts nothing and asks you to fix the opening and comment `/approve anyway`. To turn these posts off, remove `onthisday` from `rotation`.
 - **Images:** every post goes out with a picture, shown on the draft issue before you approve. Most get a **branded card**: the Hebrew headline and the English first paragraph on the brand gradient, in the Heebo font (`fonts/`, SIL Open Font License). About one in five (`images.ai_every`) gets an **AI illustration** of the topic from Cloudflare Workers AI instead. AI images are only made for safe topics, checked three ways: the post must not mention politics, war, violence, crime, death, drugs, sex, religion and similar subjects (`SENSITIVE_WORDS` in `poster/images.py`); the model writing the image prompt must judge the topic safe under the rules in `prompts/image-prompt.md`; and its prompt is checked for the same words. Every image prompt also ends with a fixed line: no people, no text, no logos, no flags. When any check says no, the post gets a card and the review notes say why. On the issue, `/image` makes a new image of the same kind, `/image card` or `/image ai` switches, `/image none` posts text only. The card shows the headline, so after editing it by hand comment `/image card` to redraw it (`/rewrite` redraws it for you).
+- **Post about one of your projects:** Actions → *Draft a post* → *Run workflow*, kind `project`. Type a repo name in *repo* (`youtube-music`, or `owner/name`), or leave it empty for a random one from `config.yml` → `projects.repos` (preferring repos without a draft in the last 60 days, never a `/block`ed one). From a terminal: `gh workflow run draft.yml -f kind=project -f repo=youtube-music`. The post is written from the repo's description and README (setup, install and license sections are left out) plus your whole profile, in the first person, since it is your work. Public repos get their link as the first comment; private ones are never linked. The schedule never picks a project post, even if you add `project` to `rotation`. Private repos other than this one need the `PROJECTS_TOKEN` secret (step 4).
 - **Queue your own topic:** open an issue with the label `topic`. The title is the subject, the body is your notes (facts, the point you want to make). Queued topics go before automatic ones, oldest first, and get your full profile.
-- **Draft now:** Actions → *Draft a post* → *Run workflow* (choose `auto`, `news`, `fact` or `onthisday`).
+- **Draft now:** Actions → *Draft a post* → *Run workflow* (choose `auto`, `news`, `fact`, `onthisday` or `project`).
 - **Change the voice or rules:** `prompts/post-system-prompt.md`. **Change the translation style:** `prompts/translate-prompt.md`. **Change the AI image rules:** `prompts/image-prompt.md` and `SENSITIVE_WORDS` in `poster/images.py`. **Change sources, schedule, limits:** `config.yml` and `.github/workflows/draft.yml`.
 
 ## Setup (once, about 20 minutes)
@@ -66,6 +68,7 @@ gh secret set LINKEDIN_ACCESS_TOKEN
 gh secret set PROFILE_YML < profile.yml
 gh secret set CLOUDFLARE_ACCOUNT_ID    # optional: AI images
 gh secret set CLOUDFLARE_API_TOKEN
+gh secret set PROJECTS_TOKEN           # optional: project posts about private repos (fine-grained token, those repos, Contents: read-only)
 gh variable set LINKEDIN_TOKEN_EXPIRES --body 2027-01-08   # the date 60 days after you generated the token
 ```
 Optional variables: `PUBLISH_MODE` (`simulated` by default, set to `linkedin` to post for real) and `TIMEZONE` (for "today" in prompts and "On this day", and the clock `/schedule` times are read in, e.g. `Europe/London`).

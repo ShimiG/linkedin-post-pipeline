@@ -251,7 +251,8 @@ def replace_image(body, info):
 
 
 def render_draft(topic, news_items, draft, extra_warnings=(), image=None):
-    kind_label = {"news": "AI news", "fact": "Coding fact", "onthisday": "On this day", "queued": "Your topic"}[topic["kind"]]
+    kind_label = {"news": "AI news", "fact": "Coding fact", "onthisday": "On this day", "queued": "Your topic",
+                  "project": "Your project"}[topic["kind"]]
     src = topic.get("source_url")
     head = [f"**{kind_label}**", f"model `{draft.model}` (attempt {draft.attempt})", f"{draft.words} words (English)"]
     if draft.post_text_he:

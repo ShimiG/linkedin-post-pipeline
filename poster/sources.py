@@ -1,5 +1,7 @@
-"""Free, keyless sources: Hacker News (Algolia search API) for AI news, Wikipedia for coding facts and "On this day" events."""
+"""Free sources: Hacker News (Algolia search API) for AI news, Wikipedia for coding facts and "On this day" events,
+and your own GitHub repositories for project posts (manual runs only)."""
 import html
+import os
 import random
 import re
 import time
@@ -275,3 +277,143 @@ def pick_onthisday(cfg, used_ids, day):
                  "source_url": url}
         return topic, [item]
     return None
+
+
+# --------------------------------------------------------------------------- your GitHub projects (manual runs only)
+GITHUB_API = "https://api.github.com"
+README_CHUNK = 1400       # each source item is cut at compose.NEWS_SNIPPET_CHARS (1500)
+README_PARTS = 3
+# README sections that are about running the code, not about what it is or why: left out of the source text.
+SKIP_SECTION = re.compile(r"^(install\w*|set ?up\b.*|quick ?start|getting started|development|contributing|license|licence|"
+                          r"run it locally|running locally|requirements|prerequisites|build\w*|test\w*|changelog|"
+                          r"acknowledg\w*|credits|troubleshooting|faq|configuration|environment variables|scripts|commands)$", re.I)
+
+
+class ProjectError(Exception):
+    """A project post could not be sourced; the message says why (shown in the Actions log)."""
+
+
+def _github(path, raw=False):
+    """GET from the GitHub API. PROJECTS_TOKEN (read access to your private repos) wins over the workflow token."""
+    from . import gh  # local import: gh imports nothing from here, but keep sources usable without it
+    token = os.environ.get("PROJECTS_TOKEN", "").strip() or gh._token()
+    headers = {"Authorization": f"Bearer {token}", "X-GitHub-Api-Version": "2022-11-28",
+               "Accept": "application/vnd.github.raw+json" if raw else "application/vnd.github+json"}
+    return request("GET", GITHUB_API + path, headers=headers, raw=raw)[2]
+
+
+def readme_text(md):
+    """README markdown -> plain text about what the project is: no code, images, badges, links or setup sections."""
+    md = re.sub(r"<!--.*?-->", "", md or "", flags=re.S)
+    md = re.sub(r"^(```|~~~).*?^\1[^\n]*$", "", md, flags=re.S | re.M)
+    out, skipping = [], False
+    for line in md.splitlines():
+        h = re.match(r"^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$", line)
+        if h:
+            title = re.sub(r"[*_`]", "", h.group(2)).strip()
+            skipping = len(h.group(1)) > 1 and bool(SKIP_SECTION.match(title))
+            if not skipping and len(h.group(1)) > 1:
+                out.append(f"\n{title}:")
+            continue
+        if skipping:
+            continue
+        if re.match(r"^\s*\|?\s*:?-{3,}", line):  # table separator row
+            continue
+        line = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", line)            # images and badges
+        line = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", line)        # links -> their text
+        line = re.sub(r"<[^>]+>", "", line)                              # html tags
+        line = re.sub(r"https?://\S+", "", line)                       # bare urls
+        line = re.sub(r"[*_`]{1,3}", "", line)
+        if line.strip().startswith("|"):
+            line = " - ".join(c.strip() for c in line.strip().strip("|").split("|") if c.strip())
+        line = re.sub(r"^\s*[-*+]\s+", "- ", line).rstrip()
+        out.append(line)
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+    text = re.sub(r"(?<![:\n])\n(?!\n|- )", " ", text)  # re-join hard-wrapped lines inside a paragraph
+    return re.sub(r"[ \t]{2,}", " ", text)
+
+
+def readme_title(md, fallback):
+    m = re.search(r"^\s{0,3}#\s+(.+?)\s*#*\s*$", md or "", re.M)
+    return re.sub(r"[*_`]|!\[[^\]]*\]\([^)]*\)", "", m.group(1)).strip() if m else fallback
+
+
+def chunks(text, size=README_CHUNK, limit=README_PARTS):
+    """Whole paragraphs, up to `size` characters per chunk, at most `limit` chunks."""
+    parts, cur = [], ""
+    for para in re.split(r"\n\s*\n", text):
+        para = para.strip()
+        if not para:
+            continue
+        if cur and len(cur) + len(para) + 2 > size:
+            parts.append(cur)
+            cur = ""
+        cur = f"{cur}\n\n{para}".strip() if len(para) <= size else (cur + "\n\n" + para[:size]).strip()[:size]
+    if cur:
+        parts.append(cur)
+    return parts[:limit]
+
+
+def project_topic(full_name):
+    """(topic, news_items) for one repository. Raises HttpError when it cannot be read, ProjectError when it says nothing."""
+    meta = _github(f"/repos/{full_name}")
+    try:
+        langs = list(_github(f"/repos/{full_name}/languages"))[:4]
+    except HttpError:
+        langs = []
+    try:
+        md = _github(f"/repos/{full_name}/readme", raw=True)
+    except HttpError as e:
+        if e.status != 404:
+            raise
+        md = ""
+    md = md if isinstance(md, str) else ""
+    text, desc = readme_text(md), (meta.get("description") or "").strip()
+    if len(text) < 150 and not desc:
+        raise ProjectError(f"{full_name} has no README text or description to write from")
+    name = meta.get("name") or full_name.split("/")[-1]
+    title = readme_title(md, name)
+    pushed = (meta.get("pushed_at") or "")[:10]
+    facts = f"My own project: the GitHub repository {name}" + (f", titled \"{title}\"" if title != name else "") + "."
+    if desc:
+        facts += f" Description: {desc}."
+    if langs:
+        facts += f" Languages: {', '.join(langs)}."
+    facts += " Public repository." if not meta.get("private") else " Private repository (not linked in the post)."
+    items = [{"title": f"{title}: repository facts", "source": "my GitHub repository", "date": pushed, "snippet": facts}]
+    for i, part in enumerate(chunks(text), 1):
+        items.append({"title": f"{title}: README, part {i}", "source": "my GitHub repository", "date": pushed, "snippet": part})
+    topic = {"kind": "project", "title": f"My project: {title}", "category": "project",
+             "angle": "My own project, described in my repository's README below." + (f" {desc}" if desc else ""),
+             "repo": meta.get("full_name") or full_name,
+             "source_url": None if meta.get("private") else meta.get("html_url")}
+    return topic, items
+
+
+def pick_project(cfg, owner, wanted="", recent=(), blocked=(), rng=random):
+    """A project post. `wanted` is a repo name (or owner/name) chosen by hand; empty = a random one from
+    config.yml -> projects.repos, preferring repos without a recent draft and never a blocked one. Raises ProjectError."""
+    wanted = (wanted or "").strip().strip("/")
+    if wanted:
+        full = wanted if "/" in wanted else f"{owner}/{wanted}"
+        try:
+            return project_topic(full)
+        except HttpError as e:
+            hint = (" If it is private, add a PROJECTS_TOKEN secret with read access to it (see README)."
+                    if e.status in (401, 403, 404) else "")
+            raise ProjectError(f"can't read {full} (HTTP {e.status}).{hint}") from None
+    names = [str(n).strip() for n in (cfg.get("projects") or {}).get("repos") or [] if str(n).strip()]
+    pool = [n for n in names if n not in blocked and f"{owner}/{n}" not in blocked]
+    if not pool:
+        raise ProjectError("no repos to choose from: list them in config.yml -> projects.repos (blocked ones are skipped)")
+    fresh = [n for n in pool if n not in recent and f"{owner}/{n}" not in recent]
+    order = list(fresh or pool)
+    rng.shuffle(order)
+    errors = []
+    for n in order:
+        full = n if "/" in n else f"{owner}/{n}"
+        try:
+            return project_topic(full)
+        except (HttpError, ProjectError) as e:
+            errors.append(f"{full}: {getattr(e, 'status', '') or e}")
+    raise ProjectError("none of the listed repos could be read (" + "; ".join(errors) + "). Private ones need the PROJECTS_TOKEN secret.")

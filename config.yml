@@ -39,6 +39,14 @@ images:
   ai_steps: 4
   branch: post-images          # images are committed here, not to main
 
+# Posts about your own GitHub projects. Manual only: Actions -> Draft a post -> Run workflow -> kind "project",
+# with a repo name, or leave the repo empty for a random one from this list. Never chosen by the schedule.
+# Private repos need the PROJECTS_TOKEN secret (a fine-grained token with read-only Contents access to them).
+projects:
+  owner: ShimiG                # whose repos; defaults to this repo's owner
+  repos: [youtube-music, job-search-agent-wf, is-it-real, linkedin-post-pipeline]
+  cooldown_days: 60            # a random pick prefers repos without a draft in this many days
+
 # Each post is written in English, translated, and published as one post: translation first, then the English.
 bilingual:
   enabled: true

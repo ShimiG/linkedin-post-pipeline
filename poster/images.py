@@ -40,6 +40,7 @@ LABELS = {  # kind -> (Hebrew label, English tag)
     "fact": ("עובדה מעולם הקוד", "Coding fact"),
     "onthisday": ("היום בהיסטוריה", "On this day"),
     "queued": ("מהשטח", "Field notes"),
+    "project": ("מהפרויקטים שלי", "My project"),
 }
 
 # Words that keep a post away from AI images. Matched as whole words, any case, in the post, its title and the image

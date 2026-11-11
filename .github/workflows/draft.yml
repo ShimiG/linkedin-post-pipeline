@@ -9,8 +9,13 @@ on:
       kind:
         description: "What to draft"
         type: choice
-        options: [auto, news, fact, onthisday]
+        options: [auto, news, fact, onthisday, project]
         default: auto
+      repo:
+        description: "Only for kind = project: the repo to post about (empty = a random one from config.yml)"
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: write   # post images are committed to the post-images branch
@@ -36,6 +41,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DRAFT_KIND: ${{ inputs.kind || 'auto' }}
+          PROJECT_REPO: ${{ inputs.repo }}
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
           PROFILE_YML: ${{ secrets.PROFILE_YML }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
