@@ -196,7 +196,7 @@ def block(issue, arg):
     labels = ["blocked"]
     if arg == "site":
         if topic.get("kind") != "news" or not topic.get("source_url"):
-            return gh.comment(n, "`/block site` only works on news drafts (the other posts all come from Wikipedia). Use **`/block`** to block just this article or event.")
+            return gh.comment(n, "`/block site` only works on news drafts. Use **`/block`** to block just this article, event or project.")
         labels.append("blocked-site")
     elif arg:
         return gh.comment(n, "Use **`/block`** for this story or article, or **`/block site`** for its whole website.")
