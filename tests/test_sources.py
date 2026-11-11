@@ -8,16 +8,17 @@ CFG = {"news": {"lookback_days": 7, "min_points": 80, "queries": ["AI", "LLM"], 
 
 def test_hn_candidates_dedupes_filters_and_sorts(monkeypatch):
     hits = {
-        "AI": [{"objectID": "1", "title": "A", "url": "https://a.com/x", "points": 100, "created_at_i": 1762600000},
+        "AI": [{"objectID": "1", "title": "AI notes", "url": "https://a.com/x", "points": 100, "created_at_i": 1762600000},
                {"objectID": "2", "title": "Repo", "url": "https://github.com/x/y", "points": 900, "created_at_i": 1762600000},
                {"objectID": "3", "title": "Ask HN", "url": None, "points": 500, "created_at_i": 1762600000}],
-        "LLM": [{"objectID": "1", "title": "A", "url": "https://a.com/x", "points": 100, "created_at_i": 1762600000},
-                {"objectID": "4", "title": "B", "url": "https://www.b.org/y", "points": 300, "created_at_i": 1762600000},
+        "LLM": [{"objectID": "1", "title": "AI notes", "url": "https://a.com/x", "points": 100, "created_at_i": 1762600000},
+                {"objectID": "6", "title": "Paper Airplanes", "url": "https://p.com", "points": 800, "created_at_i": 1762600000},
+                {"objectID": "4", "title": "LLMs at work", "url": "https://www.b.org/y", "points": 300, "created_at_i": 1762600000},
                 {"objectID": "5", "title": "Used", "url": "https://c.com", "points": 999, "created_at_i": 1762600000}],
     }
     monkeypatch.setattr(sources, "get_json", lambda url, **kw: {"hits": hits["AI" if "query=AI" in url else "LLM"]})
     out = sources.hn_candidates(CFG, used_ids={"5"}, now=1762700000)
-    assert [c["hn_id"] for c in out] == ["4", "1"]
+    assert [c["hn_id"] for c in out] == ["4", "1"]  # 6 matched "AI" only as a prefix of "Airplanes"
     assert out[0]["source"] == "b.org"
 
 

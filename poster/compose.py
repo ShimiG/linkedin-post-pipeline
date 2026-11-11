@@ -1,5 +1,7 @@
 """Prompt building + the generate -> guardrail -> retry loop, shared by drafting and /rewrite."""
 import json
+import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from . import examples as examples_mod
@@ -28,9 +30,65 @@ class Draft:
         return len(self.post_text.split())
 
 
-def combine(cfg, he, en):
-    """The text that is actually published: translation, separator, English. English only when there is no translation."""
+RLM = "\u200f"  # right-to-left mark: invisible, makes a line that opens with an English word read right to left
+HEBREW_LETTER = re.compile(r"[\u0590-\u05ff]")
+LATIN_END = re.compile(r"(?<=[A-Za-z0-9)\]])([.?!:;,]+)\s*$")
+LANGS = {"hebrew": "he", "he": "he", "עברית": "he", "english": "en", "en": "en", "אנגלית": "en", "both": "both", "combined": "both"}
+LANG_NAME = {"he": "Hebrew", "en": "English", "both": "Hebrew and English"}
+
+
+def _first_strong(line):
+    for ch in line:
+        d = unicodedata.bidirectional(ch)
+        if d in ("R", "AL"):
+            return "R"
+        if d == "L":
+            return "L"
+    return ""
+
+
+def rtl_marks(text):
+    """LinkedIn sets each line's direction from its first letter. A Hebrew line that opens with an English word
+    (\"Claude ...\") would be shown left to right, and a period after a closing English word can jump to the wrong side.
+    An invisible right-to-left mark at the start (and before that period) keeps such lines right to left.
+    Lines without Hebrew letters (the "*English below" line, hashtags) are left alone."""
+    out = []
+    for line in (text or "").split("\n"):
+        if HEBREW_LETTER.search(line):
+            if _first_strong(line) == "L":
+                line = RLM + line
+            line = LATIN_END.sub(lambda m: RLM + m.group(1), line)
+        out.append(line)
+    return "\n".join(out)
+
+
+def separate(cfg):
+    """True when each language is published as its own post (/approve hebrew, /approve english)."""
+    return str((cfg.get("bilingual") or {}).get("publish") or "combined").strip().lower() == "separate"
+
+
+def without_marker(cfg, he):
+    """The Hebrew part on its own: the "*English below" line removed (drafts made for one combined post have it)."""
+    marker = str((cfg.get("bilingual") or {}).get("english_marker") or "").strip()
+    if not marker:
+        return he
+    lines = [l for l in (he or "").split("\n") if l.strip() != marker]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def version(cfg, he, en, lang):
+    """The text published for `lang`: "he" (Hebrew alone), "en" (English alone) or "both" (one post, Hebrew first)."""
     he, en = (he or "").strip(), (en or "").strip()
+    if lang == "he":
+        return rtl_marks(without_marker(cfg, he))
+    if lang == "en":
+        return en
+    return combine(cfg, he, en)
+
+
+def combine(cfg, he, en):
+    """One post with both versions: translation, separator, English. English only when there is no translation."""
+    he, en = rtl_marks((he or "").strip()), (en or "").strip()
     if not he:
         return en
     if not en:
@@ -49,8 +107,9 @@ def notes_of(out):
 
 
 def hebrew_part(cfg, headline, body):
-    """What opens the post: the headline, the "*English below" line, a blank line, then the Hebrew text."""
-    marker = str((cfg.get("bilingual") or {}).get("english_marker") or "").strip()
+    """The Hebrew version: the headline, then (only when both go out as one post) the "*English below" line,
+    a blank line, then the Hebrew text."""
+    marker = "" if separate(cfg) else str((cfg.get("bilingual") or {}).get("english_marker") or "").strip()
     top = f"{headline}\n{marker}" if marker else headline
     return f"{top}\n\n{body}"
 
@@ -81,10 +140,10 @@ def translate(cfg, english):
         if res.ok and headline_on:
             hres = guardrail.check_headline(out.get("headline_he", ""), english, today=today(cfg))
             if hres.ok:
-                return hebrew_part(cfg, hres.post_text, res.post_text), model, notes_of(out)
+                return hebrew_part(cfg, hres.post_text, res.post_text), model, notes_of(out) + guardrail.formal_words(res.post_text)
             res = hres
         elif res.ok:
-            return res.post_text, model, notes_of(out)
+            return res.post_text, model, notes_of(out) + guardrail.formal_words(res.post_text)
         last = res.message
         print(f"translation attempt {attempt}: {res.message}")
         note = guardrail.translation_retry_note(res)
@@ -102,10 +161,11 @@ def add_translation(cfg, draft):
     except RuntimeError as e:
         draft.warnings.append(f"{language} translation failed ({e}). Only the English text will be posted; comment /rewrite to try again.")
         return draft
-    total = len(combine(cfg, draft.post_text_he, draft.post_text))
     limit = int((cfg.get("bilingual") or {}).get("max_total_chars") or 3000)
+    total = len(version(cfg, draft.post_text_he, draft.post_text, "he" if separate(cfg) else "both"))
     if total > limit:
-        draft.warnings.append(f"The combined post is {total} characters, over LinkedIn's {limit}. Shorten it (or /rewrite shorter) before approving.")
+        what = "The Hebrew post" if separate(cfg) else "The combined post"
+        draft.warnings.append(f"{what} is {total} characters, over LinkedIn's {limit}. Shorten it (or /rewrite shorter) before approving.")
     return draft
 
 
@@ -152,6 +212,7 @@ def write(cfg, author, topic, news_items, *, instruction=None, current=None, exa
             continue
         res = guardrail.check(out.get("post_text", ""), author=author, topic=topic, news_items=news_items, today=today(cfg),
                               max_chars=P["max_chars"], max_hashtags=P["max_hashtags"], signature=P.get("signature") or "",
+                              hook_max=int(P.get("hook_max_chars") or 0),
                               examples=ex, copy_ngram=int((cfg.get("examples") or {}).get("copy_ngram", 8)))
         if res.ok:
             warnings = [str(w) for w in out.get("warnings") or [] if str(w).strip().lower().strip(".") not in EMPTY_NOTES]

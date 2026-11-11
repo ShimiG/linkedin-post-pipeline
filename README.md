@@ -1,9 +1,9 @@
 # LinkedIn post pipeline (GitHub Actions)
 
-Drafts a LinkedIn post three times a week from free sources, fact-checks it, translates it to Hebrew, and opens a GitHub issue for you to approve. The published post opens with a short Hebrew headline about the post and a `*English below` line, then the Hebrew text, then the English. Comment `/approve` and it is published on your personal profile. No server, no database, no paid services.
+Drafts a LinkedIn post three times a week from free sources, fact-checks it, translates it to Hebrew, and opens a GitHub issue for you to approve. The issue holds both versions: a Hebrew post (a short Hebrew headline, then the text) and an English post. Each goes out as its own post: comment `/approve hebrew` or `/approve english`, or `/schedule hebrew next` for its next good time slot. No server, no database, no paid services.
 
 ```
-schedule Mon/Wed/Fri ──▶ draft job
+schedule Sun/Tue/Thu ──▶ draft job (early morning, Israel time)
                            ├─ your queued `topic` issue, if any, else take turns:
                            │    AI news     ← Hacker News (top AI story this week) + the article text
                            │    coding fact ← a Wikipedia article from config.yml
@@ -11,16 +11,21 @@ schedule Mon/Wed/Fri ──▶ draft job
                            │  (your project ← one of your GitHub repos: only when you run it by hand)
                            ├─ Groq writes the post in your voice (Gemini as fallback)
                            ├─ guardrail: every number and outlet must be in the sources, no links, ≤ 3 hashtags,
-                           │    no article story retold as yours, no wording copied from your examples
-                           ├─ Hebrew translation + headline, checked: Hebrew script, no new numbers, no links or hashtags
+                           │    a first line short enough for phones, no article story retold as yours,
+                           │    no wording copied from your examples
+                           ├─ Hebrew translation + headline, checked: Hebrew script, no new numbers, no links or hashtags,
+                           │    no English clichés translated word for word, no "עשה/י" slash forms
                            ├─ image: a branded card, or about one post in five an AI illustration (safe topics only)
                            └─ opens a `draft` issue  ──▶ you get a GitHub notification
 
 you comment on the issue ──▶ review job
-                           ├─ /approve          → one LinkedIn post (headline, *English below, Hebrew, • • •, English);
-                           │                       the issue then gives you the source link to paste as the first comment
-                           │                       (an "On this day" post approved on another date needs /approve anyway)
-                           ├─ /schedule dd/mm/yyyy HH:MM → the same as /approve, but at that time (/unschedule cancels)
+                           ├─ /approve hebrew   → the Hebrew post (/approve english: the English one; /approve both: one post with
+                           │                       both); the issue then gives you the source link to paste as the first comment
+                           │                       and stays open for the other version
+                           │                       (an "On this day" post approved on another date needs /approve … anyway;
+                           │                        so does one approved on Friday afternoon or Saturday)
+                           ├─ /schedule hebrew next → that version at its next good time slot, never the same day as the other
+                           ├─ /schedule english dd/mm/yyyy HH:MM → that version at that time (/unschedule [version] cancels)
                            ├─ /reject           → closed; that story/article may come back after a 7-day cooldown
                            ├─ /block [site]     → closed; that story/article (or the whole website) is never used again
                            ├─ /image [card|ai|none] → a new image, another kind, or none
@@ -30,10 +35,14 @@ you comment on the issue ──▶ review job
 The issues are the whole system of record: what was drafted, which sources were used, what was published. The bot only commits post images (to the `post-images` branch, never `main`) and saved writing examples.
 
 ## Using it
-- **Approve from your phone:** the GitHub mobile app notifies you about the new issue; reply `/approve`.
-- **Publish later:** reply `/schedule 25/12/2026 09:30` (day/month/year, 24-hour clock, in your `TIMEZONE`). It is a delayed `/approve`: the draft gets the `scheduled` label, and the *Publish scheduled posts* workflow posts it with its first check after that time (checks run every 15 minutes, so allow up to about 20 minutes). What is posted is the text in the issue at that moment, so you can keep editing. `/unschedule` cancels, `/schedule` with a new time moves it, `/approve` publishes right away, `/reject` drops it. If publishing fails at that time (an expired token, say), the issue tells you and the schedule is cancelled, it does not retry on its own.
-- **Edit by hand:** edit the issue and change the Hebrew (`<!-- post-he:… -->`) or English (`<!-- post-en:… -->`) block, then `/approve`. What you approve is exactly what is posted: the Hebrew block (headline, `*English below`, Hebrew text), a `• • •` line, then the English. Empty the Hebrew block to post English only. The _italic_ notes in the issue are never posted.
-- **Bilingual on or off:** `config.yml` → `bilingual.enabled`. The headline is `bilingual.headline`, the line under it `bilingual.english_marker`, the separator `bilingual.separator`.
+- **Approve from your phone:** the GitHub mobile app notifies you about the new issue; reply `/approve hebrew` or `/approve english`.
+- **Two posts, not one:** a post with both languages hides the second one below "...see more" on phones, so each language is its own post (`config.yml` → `bilingual.publish: separate`; `combined` brings back the single post with both). Post one version, and the issue stays open for the other: `/schedule hebrew next` puts it on its next good time slot on another day. Close the issue if you only want one. Drafts without a translation need no version: `/approve` posts the English.
+- **When to post:** Israel works Sunday to Thursday, and Sunday morning is the busiest time of the week. `config.yml` → `posting` sets a slot for each language (Hebrew Sunday to Thursday 08:30 to 10:30, English Monday to Thursday 09:30 to 11:00) and the quiet hours (Friday 12:00 until Saturday night). `/schedule <version> next` picks the next slot, and `/approve` in the quiet hours posts nothing and asks first (`/approve <version> anyway` posts). After posting, reply to comments in the first hour: that is what LinkedIn weighs most when deciding who else sees a post.
+- **Right to left on LinkedIn:** LinkedIn sets each line's direction from its first letter, so a Hebrew line opening with "Claude" or "Kubernetes" would be shown left to right. When the Hebrew post is published, an invisible right-to-left mark is added to such lines (and before a period that follows a closing English word). The issue shows the text without the marks.
+- **Publish later:** reply `/schedule hebrew next`, or `/schedule english 25/12/2026 09:30` (day/month/year, 24-hour clock, in your `TIMEZONE`). Each version has its own schedule. It is a delayed `/approve`: the draft gets the `scheduled` label, and the *Publish scheduled posts* workflow posts it with its first check after that time (checks run every 15 minutes, so allow up to about 20 minutes). What is posted is the text in the issue at that moment, so you can keep editing. `/unschedule` cancels, `/schedule` with a new time moves it, `/approve` publishes right away, `/reject` drops it. If publishing fails at that time (an expired token, say), the issue tells you and the schedule is cancelled, it does not retry on its own.
+- **Edit by hand:** edit the issue and change the Hebrew (`<!-- post-he:… -->`) or English (`<!-- post-en:… -->`) block, then approve. What you approve is exactly what is posted: `/approve hebrew` posts the Hebrew block (headline, then the text), `/approve english` the English block. Empty the Hebrew block to post English only. The _italic_ notes in the issue are never posted.
+- **Bilingual on or off:** `config.yml` → `bilingual.enabled`. The headline is `bilingual.headline`. With `bilingual.publish: combined`, the line under it is `bilingual.english_marker` and the separator `bilingual.separator`.
+- **AI news stays about AI:** Hacker News search also matches word prefixes ("AI" finds "Airplanes"), so a story is used only when its title has one of `news.title_words` as a whole word. Coding facts and "On this day" posts end by tying the subject to today's work with AI and automation.
 - **Reject or block:** `/reject` drops just this post; its story or article can be drafted again after `review.reject_cooldown_days` (7). `/block` drops it and never uses that story, Wikipedia article or event again; `/block site` never uses that website again (news only). Both work on closed drafts too, and `/unblock` undoes them.
 - **Writing examples:** posts you like teach the drafts your style. Open an issue labelled `example` (title: why you like it, body: the post text), or comment `/example` on one of your own drafts. They are saved in `examples/`; each draft sees 3 of them as style references, never as facts, and a draft that copies 8 words in a row from one is rejected.
 - **On this day:** every third automatic post is about something that happened on today's date in an earlier year: an event, a birth or a death from Wikipedia's "On this day" list, with the linked articles as background. Only entries matching `config.yml` → `on_this_day.keywords` (computing and AI by default) are used; on a date with no match the run drafts the next kind instead. The draft is tied to its date: approve it the same day. On a later day `/approve` posts nothing and asks you to fix the opening and comment `/approve anyway`. To turn these posts off, remove `onthisday` from `rotation`.
@@ -75,7 +84,7 @@ Optional variables: `PUBLISH_MODE` (`simulated` by default, set to `linkedin` to
 
 ### 5. Try it
 1. Actions → *Draft a post* → *Run workflow*. A `draft` issue appears within a minute.
-2. Comment `/approve`. In simulated mode it shows what would be posted and closes the issue.
+2. Comment `/approve english` (or `hebrew`). In simulated mode it shows what would be posted and closes the issue.
 3. When you are happy: `gh variable set PUBLISH_MODE --body linkedin`.
 
 ## Run it locally

@@ -15,7 +15,8 @@ HE_START, HE_END = "<!-- post-he:start -->", "<!-- post-he:end -->"       # tran
 EN_START, EN_END = "<!-- post-en:start -->", "<!-- post-en:end -->"
 SECTION_START, SECTION_END = "<!-- post-section:start -->", "<!-- post-section:end -->"  # wraps the blocks + headings
 META_RE = re.compile(r"<!-- meta: (\{.*?\}) -->", re.S)
-PUBLISH_AT_RE = re.compile(r"\n*<!-- publish-at: (\S+) -->")                # set by /schedule, read by poster.scheduled
+PUBLISH_AT_RE = re.compile(r"\n*<!-- publish-at: (\S+)(?: (he|en|both))? -->")  # set by /schedule, read by poster.scheduled; one per version
+PUBLISHED_RE = re.compile(r"\n*<!-- published: (\{.*?\}) -->")               # when each version went out: {"en": iso, ...}
 IMG_START, IMG_END = "<!-- post-image:start -->", "<!-- post-image:end -->"  # the image shown on the issue and posted
 IMAGE_RE = re.compile(r"<!-- image: (\{.*?\}) -->", re.S)
 SCHEDULED_WORKFLOW = "scheduled.yml"
@@ -23,6 +24,8 @@ LABELS = {
     "draft": ("0e8a16", "A post draft waiting for /approve, /schedule, /reject or /rewrite"),
     "topic": ("1d76db", "A post idea you queued; drafted before automatic topics"),
     "published": ("5319e7", "Posted to LinkedIn"),
+    "published-he": ("5319e7", "The Hebrew version is posted"),
+    "published-en": ("5319e7", "The English version is posted"),
     "simulated": ("c5def5", "Approved in simulated mode, nothing was posted"),
     "scheduled": ("bfd4f2", "Approved for later: published at the time given to /schedule"),
     "rejected": ("b60205", "Rejected, never posted; the source may be drafted again after the cooldown"),
@@ -164,22 +167,55 @@ def parse_meta(body):
         return {}
 
 
-def publish_at(body):
-    """The time a draft is scheduled for (aware datetime), or None."""
-    m = PUBLISH_AT_RE.search(body or "")
-    if not m:
-        return None
-    try:
-        when = datetime.fromisoformat(m.group(1))
-    except ValueError:
-        return None
-    return when if when.tzinfo else None
+def schedules(body):
+    """{version: aware datetime} for every scheduled version ("he", "en", or "both" = one post with both)."""
+    out = {}
+    for m in PUBLISH_AT_RE.finditer(body or ""):
+        try:
+            when = datetime.fromisoformat(m.group(1))
+        except ValueError:
+            continue
+        if when.tzinfo:
+            out[m.group(2) or "both"] = when
+    return out
 
 
-def with_publish_at(body, when):
-    """The issue body with its schedule set to `when`, or removed when `when` is None."""
+def publish_at(body, lang=None):
+    """The time a version is scheduled for (the earliest of them when `lang` is None), or None."""
+    s = schedules(body)
+    if lang:
+        return s.get(lang)
+    return min(s.values()) if s else None
+
+
+def with_publish_at(body, when, lang=None):
+    """The issue body with the schedule of `lang` set to `when` (removed when `when` is None).
+    `lang` None replaces every schedule (with one for both versions)."""
+    entries = {} if lang is None else schedules(body)
+    if when:
+        entries[lang or "both"] = when
+    else:
+        entries.pop(lang, None)
     body = PUBLISH_AT_RE.sub("", body or "").rstrip()
-    return f"{body}\n\n<!-- publish-at: {when.isoformat(timespec='minutes')} -->" if when else body
+    for l, w in sorted(entries.items(), key=lambda e: e[1]):
+        body += f"\n\n<!-- publish-at: {w.isoformat(timespec='minutes')} {l} -->"
+    return body
+
+
+def published_times(body):
+    """{version: aware datetime} for the versions already posted from this draft."""
+    m = PUBLISHED_RE.search(body or "")
+    try:
+        raw = json.loads(m.group(1)) if m else {}
+        return {k: datetime.fromisoformat(v) for k, v in raw.items()}
+    except (json.JSONDecodeError, ValueError, TypeError, AttributeError):
+        return {}
+
+
+def with_published(body, lang, when):
+    times = {k: v.isoformat(timespec="minutes") for k, v in published_times(body).items()}
+    times[lang] = when.isoformat(timespec="minutes")
+    return PUBLISHED_RE.sub("", body or "").rstrip() + f"\n\n<!-- published: {json.dumps(times)} -->"
 
 
 def _between(body, start, end):
@@ -197,9 +233,12 @@ def parse_parts(body):
     return "", _between(body, POST_START, POST_END) or ""
 
 
-def post_section(he, en):
+def post_section(he, en, separate=False):
     """The editable post area of an issue: Hebrew block (if any) then English block, wrapped so it can be swapped whole."""
-    if he:
+    if he and separate:
+        inner = (f"_Hebrew post (**`/approve hebrew`**): headline, then the text:_\n\n{HE_START}\n{he}\n{HE_END}\n\n"
+                 f"_English post (**`/approve english`**):_\n\n{EN_START}\n{en}\n{EN_END}")
+    elif he:
         inner = (f"_Part 1, exactly as posted (headline, \"English below\" line, Hebrew text):_\n\n{HE_START}\n{he}\n{HE_END}\n\n"
                  f"_Part 2, posted after a separator line:_\n\n{EN_START}\n{en}\n{EN_END}")
     else:
@@ -250,7 +289,7 @@ def replace_image(body, info):
     raise ValueError("no post markers in the issue body")
 
 
-def render_draft(topic, news_items, draft, extra_warnings=(), image=None):
+def render_draft(topic, news_items, draft, extra_warnings=(), image=None, separate=False):
     kind_label = {"news": "AI news", "fact": "Coding fact", "onthisday": "On this day", "queued": "Your topic",
                   "project": "Your project"}[topic["kind"]]
     src = topic.get("source_url")
@@ -261,7 +300,7 @@ def render_draft(topic, news_items, draft, extra_warnings=(), image=None):
     if src:
         lines += [f"**Source:** [{topic['title']}]({src})" + (f" · [HN discussion]({topic['discussion_url']})" if topic.get("discussion_url") else ""), ""]
     lines += ["The post. The notes in _italics_ are only for you; everything between the markers is posted. Edit it by hand if you like:", "",
-              post_section(draft.post_text_he, draft.post_text), ""]
+              post_section(draft.post_text_he, draft.post_text, separate and bool(draft.post_text_he)), ""]
     if image is not None:
         lines += [image_section(image), ""]
     warnings = list(draft.warnings) + list(extra_warnings)
@@ -271,7 +310,12 @@ def render_draft(topic, news_items, draft, extra_warnings=(), image=None):
         lines += ["<details><summary>Facts used</summary>", ""] + [f"- {f}" for f in draft.facts_used] + ["", "</details>", ""]
     if src:
         lines += [f"**Source link for the first comment:** {src} (after `/approve`, the bot tells you where to paste it)", ""]
-    lines += ["---", "Reply with **`/approve`** to publish, **`/schedule dd/mm/yyyy HH:MM`** to publish at that time, **`/reject`** to drop this post, **`/block`** to drop it and never use this source again"
+    if separate and draft.post_text_he:
+        first = ("Reply with **`/approve hebrew`** or **`/approve english`** to publish that version now, "
+                 "**`/schedule hebrew next`** (or `english`) for its next good time slot, **`/schedule hebrew dd/mm/yyyy HH:MM`** for a time of your own, ")
+    else:
+        first = "Reply with **`/approve`** to publish, **`/schedule dd/mm/yyyy HH:MM`** to publish at that time, "
+    lines += ["---", first + "**`/reject`** to drop this post, **`/block`** to drop it and never use this source again"
               + (" (**`/block site`** for the whole website)" if topic["kind"] == "news" else "")
               + ", or **`/rewrite <what to change>`** for an AI rewrite"
               + (" (the English is rewritten, then translated again)." if draft.post_text_he else "."), ""]
@@ -280,11 +324,11 @@ def render_draft(topic, news_items, draft, extra_warnings=(), image=None):
     return "\n".join(lines)
 
 
-def replace_parts(body, he, en):
+def replace_parts(body, he, en, separate=False):
     """Swap in new text, keeping everything else. Converts an older single-block issue to the new layout."""
     for start, end in ((SECTION_START, SECTION_END), (POST_START, POST_END)):
         if start in body and end in body:
             a, rest = body.split(start, 1)
             _, b = rest.split(end, 1)
-            return f"{a}{post_section(he, en)}{b}"
+            return f"{a}{post_section(he, en, separate)}{b}"
     raise ValueError("no post markers in the issue body")

@@ -21,6 +21,7 @@ llm:
 post:
   max_chars: 1300              # LinkedIn allows 3000; short posts read better
   max_hashtags: 3
+  hook_max_chars: 140          # the first line must fit before "...see more" on phones; longer drafts are sent back
   signature: ""                # optional fixed last line, appended if missing, excluded from checks
   # Links in the post body cut reach, so the source belongs in the first comment.
   #   manual: after publishing, the issue tells you the link to paste as the first comment (works with any app)
@@ -47,19 +48,33 @@ projects:
   repos: [youtube-music, job-search-agent-wf, is-it-real, linkedin-post-pipeline]
   cooldown_days: 60            # a random pick prefers repos without a draft in this many days
 
-# Each post is written in English, translated, and published as one post: translation first, then the English.
+# Each post is written in English and translated. Both versions are on the draft issue.
+#   separate: each language is its own LinkedIn post. /approve hebrew or /approve english posts one, and the issue stays
+#             open for the other (/schedule hebrew next puts it on another day). Reaches more people than one long post.
+#   combined: one post, translation first, then the English (/approve posts it).
 bilingual:
   enabled: true
+  publish: separate
   language: Hebrew             # the script check in guardrail.check_translation is Hebrew-specific
   headline: true               # the post opens with a short Hebrew headline about the post...
-  english_marker: "*English below"   # ...then this line, then the Hebrew text
-  separator: "• • •"           # line between the two versions
-  max_total_chars: 3000        # LinkedIn's limit for the combined post
+  english_marker: "*English below"   # ...then this line (combined only), then the Hebrew text
+  separator: "• • •"           # line between the two versions (combined only)
+  max_total_chars: 3000        # LinkedIn's limit for one post
+
+# When posts go out, in `timezone`. /schedule <version> next picks the next slot of that version, never on the day the
+# other version went out (or is scheduled). /approve in the quiet hours asks first (/approve <version> anyway posts).
+# Israel works Sunday to Thursday; Sunday morning is the busiest time of the week for Hebrew posts.
+posting:
+  hebrew:  {days: [sun, mon, tue, wed, thu], from: "08:30", until: "10:30"}
+  english: {days: [mon, tue, wed, thu], from: "09:30", until: "11:00"}   # the work week abroad starts Monday
+  quiet:   {from: "fri 12:00", until: "sun 00:00"}
 
 news:
   lookback_days: 7
   min_points: 80               # Hacker News points, a cheap "is anyone talking about this" filter
   queries: [AI, LLM, OpenAI, Anthropic, Claude, Gemini, GPT, "machine learning", "AI agents", "open source model"]
+  # A story is used only when its title has one of these as a whole word (search also matches prefixes: "AI" finds "Airplanes").
+  title_words: [AI, LLM, OpenAI, Anthropic, Claude, Gemini, GPT, ChatGPT, Copilot, DeepSeek, Mistral, Llama, "machine learning", "neural network", agent]
   max_candidates: 8            # stories tried, best first, until one has a readable article
 
 # "On this day" posts: something that happened on today's date in an earlier year, from Wikipedia's On this day list.
