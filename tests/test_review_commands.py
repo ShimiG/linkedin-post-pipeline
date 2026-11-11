@@ -23,7 +23,7 @@ def issue(labels=("draft",)):
 
 
 def test_approve_simulated_posts_nothing(board, monkeypatch):
-    monkeypatch.setattr(linkedin, "publish", lambda *a: pytest.fail("must not publish in simulated mode"))
+    monkeypatch.setattr(linkedin, "publish", lambda *a, **k: pytest.fail("must not publish in simulated mode"))
     review.approve(CFG, issue())
     names = [e[0] for e in board]
     assert names == ["comment", "add_labels", "close"]
@@ -33,20 +33,20 @@ def test_approve_simulated_posts_nothing(board, monkeypatch):
 
 def test_approve_live_publishes_with_source_comment(board, monkeypatch):
     sent = {}
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: sent.update(text=text, fc=fc) or ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: sent.update(text=text, fc=fc) or ("urn:li:share:1", "https://li/1", None))
     review.approve({**CFG, "publish_mode": "linkedin"}, issue())
     assert sent == {"text": "גוף הפוסט.\n\n• • •\n\nPost body.", "fc": "Source: https://ex.com/a"}
     assert ("add_labels", (7, ["published"]), {}) in board
 
 
 def test_approve_refuses_double_publish(board, monkeypatch):
-    monkeypatch.setattr(linkedin, "publish", lambda *a: pytest.fail("published twice"))
+    monkeypatch.setattr(linkedin, "publish", lambda *a, **k: pytest.fail("published twice"))
     review.approve({**CFG, "publish_mode": "linkedin"}, issue(("draft", "published")))
     assert board[0][1][1].startswith("Already published")
 
 
 def test_approve_linkedin_error_keeps_issue_open(board, monkeypatch):
-    def boom(*a):
+    def boom(*a, **k):
         raise linkedin.LinkedInError("token expired")
     monkeypatch.setattr(linkedin, "publish", boom)
     review.approve({**CFG, "publish_mode": "linkedin"}, issue())
@@ -111,7 +111,7 @@ def live_with(mode):
 
 def test_manual_mode_never_calls_comment_api_and_reminds(board, monkeypatch):
     sent = {}
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: sent.update(fc=fc) or ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: sent.update(fc=fc) or ("urn:li:share:1", "https://li/1", None))
     review.approve(live_with("manual"), issue())
     assert sent["fc"] is None
     msg = [e for e in board if e[0] == "comment"][0][1][1]
@@ -119,21 +119,21 @@ def test_manual_mode_never_calls_comment_api_and_reminds(board, monkeypatch):
 
 
 def test_auto_mode_falls_back_to_reminder_on_403(board, monkeypatch):
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: ("urn:li:share:1", "https://li/1", "LinkedIn refused (403)"))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: ("urn:li:share:1", "https://li/1", "LinkedIn refused (403)"))
     review.approve(live_with("auto"), issue())
     msg = [e for e in board if e[0] == "comment"][0][1][1]
     assert "could not add it" in msg and "Source: https://ex.com/a" in msg
 
 
 def test_auto_mode_success_needs_no_reminder(board, monkeypatch):
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: ("urn:li:share:1", "https://li/1", None))
     review.approve(live_with("auto"), issue())
     assert "first comment" not in [e for e in board if e[0] == "comment"][0][1][1]
 
 
 def test_off_mode(board, monkeypatch):
     sent = {}
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: sent.update(fc=fc) or ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: sent.update(fc=fc) or ("urn:li:share:1", "https://li/1", None))
     review.approve(live_with("off"), issue())
     assert sent["fc"] is None and "first comment" not in [e for e in board if e[0] == "comment"][0][1][1]
 

@@ -19,7 +19,7 @@ def board(monkeypatch):
     log = []
     for name in ("comment", "add_labels", "remove_label", "close", "update_issue", "set_workflow"):
         monkeypatch.setattr(gh, name, lambda *a, _n=name, **k: log.append((_n, a, k)))
-    monkeypatch.setattr(linkedin, "publish", lambda *a: pytest.fail("must not publish"))
+    monkeypatch.setattr(linkedin, "publish", lambda *a, **k: pytest.fail("must not publish"))
     return log
 
 
@@ -116,7 +116,7 @@ def test_unschedule(board):
 
 
 def test_approve_now_takes_the_draft_off_the_schedule(board, monkeypatch):
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: ("urn:li:share:1", "https://li/1", None))
     assert review.approve(CFG, issue(("draft", "scheduled"), FUTURE))
     assert names(board) == ["remove_label", "update_issue", "comment", "add_labels", "close"]
 
@@ -128,7 +128,7 @@ DUE, LATER = NOW - timedelta(minutes=3), NOW + timedelta(hours=2)
 
 def test_run_publishes_what_is_due_and_leaves_the_rest(board, monkeypatch):
     sent = []
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: sent.append(text) or ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: sent.append(text) or ("urn:li:share:1", "https://li/1", None))
     waiting = [issue(("draft", "scheduled"), DUE, 1), issue(("draft", "scheduled"), LATER, 2), issue(("scheduled",), DUE, 3)]
     monkeypatch.setattr(gh, "issues", lambda label, state="all": waiting)
     assert scheduled.run(CFG, NOW) == (1, 0)
@@ -140,14 +140,14 @@ def test_run_publishes_what_is_due_and_leaves_the_rest(board, monkeypatch):
 
 
 def test_run_skips_the_on_this_day_date_check(board, monkeypatch):
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: ("urn:li:share:1", "https://li/1", None))
     monkeypatch.setattr(review, "today", lambda cfg: date(2026, 12, 25))     # not 10 November: /schedule already asked
     monkeypatch.setattr(gh, "issues", lambda label, state="all": [issue(("draft", "scheduled"), DUE, kind="onthisday")])
     assert scheduled.run(CFG, NOW) == (0, 0) and "close" in names(board)
 
 
 def test_failed_publish_cancels_the_schedule_and_is_not_retried(board, monkeypatch):
-    def boom(*a):
+    def boom(*a, **k):
         raise linkedin.LinkedInError("token expired")
     monkeypatch.setattr(linkedin, "publish", boom)
     monkeypatch.setattr(gh, "issues", lambda label, state="all": [issue(("draft", "scheduled"), DUE)])
@@ -164,7 +164,7 @@ def test_missing_time_is_reported_not_published(board, monkeypatch):
 
 def test_one_broken_draft_does_not_block_the_next(board, monkeypatch):
     sent = []
-    monkeypatch.setattr(linkedin, "publish", lambda text, fc: sent.append(text) or ("urn:li:share:1", "https://li/1", None))
+    monkeypatch.setattr(linkedin, "publish", lambda text, fc, **k: sent.append(text) or ("urn:li:share:1", "https://li/1", None))
     real = gh.remove_label
 
     def flaky(number, label):

@@ -1,4 +1,4 @@
-"""Runs when the repo owner comments on a `draft` issue: /approve [anyway], /schedule <when>, /unschedule, /reject, /rewrite <instruction>.
+"""Runs when the repo owner comments on a `draft` issue: /approve [anyway], /schedule <when>, /unschedule, /reject, /rewrite <instruction>, /image [card|ai|none].
 
 Inputs come from the workflow as env vars (never interpolated into shell): ISSUE_NUMBER, COMMENT_BODY.
 """
@@ -7,7 +7,7 @@ import re
 import sys
 from datetime import date, datetime
 
-from . import compose, examples, gh, linkedin, sources
+from . import compose, examples, gh, images, linkedin, sources
 from .config import load_config, load_profile, today, tz
 from .http import HttpError
 from .draft import author_for
@@ -15,7 +15,7 @@ from .draft import author_for
 LINKEDIN_MAX = 3000
 WHEN_RE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})[ ,]+(\d{1,2}):(\d{2})(?:\s+(anyway))?$", re.I)
 SCHEDULE_CANCELLED = "The schedule is cancelled. Fix it, then comment `/approve` to publish now or `/schedule dd/mm/yyyy HH:MM` again."
-HELP = "Commands: **`/approve`** publishes the text between the markers (Hebrew first, then English), **`/schedule dd/mm/yyyy HH:MM`** publishes it at that time (**`/unschedule`** cancels), **`/reject`** drops this post, **`/block`** (or **`/block site`**) drops it and never uses that source again, **`/rewrite <what to change>`** asks the AI for a new version, **`/example`** saves it as a writing example."
+HELP = "Commands: **`/approve`** publishes the text between the markers (Hebrew first, then English), **`/schedule dd/mm/yyyy HH:MM`** publishes it at that time (**`/unschedule`** cancels), **`/reject`** drops this post, **`/block`** (or **`/block site`**) drops it and never uses that source again, **`/rewrite <what to change>`** asks the AI for a new version, **`/image`** makes a new image (**`/image card`**, **`/image ai`**, **`/image none`**), **`/example`** saves it as a writing example."
 
 
 def parse_command(text):
@@ -73,17 +73,27 @@ def approve(cfg, issue, arg="", scheduled=False):
     if "scheduled" in labels and not scheduled:
         clear_schedule(issue)  # approved early: nothing left for the scheduled run
     lead = ":alarm_clock: Scheduled time reached. " if scheduled else ""
+    img = gh.parse_image(issue.get("body"))
+    has_image = img.get("kind") in ("card", "ai") and img.get("path")
 
     if cfg["publish_mode"] != "linkedin":
         gh.comment(n, lead + "**Simulated** (publish_mode is `simulated`), nothing was posted. This is what would go out:\n\n"
                    + "\n".join("> " + l for l in post.splitlines())
+                   + (f"\n\nWith this image:\n\n<img src=\"{gh.file_url(img['path'], img['branch'])}\" width=\"300\" alt=\"post image\">" if has_image else "")
                    + (f"\n\nFirst comment ({'by the bot' if mode == 'auto' else 'you add it'}): {link_line}" if mode != "off" else "")
                    + "\n\nSet the repo variable `PUBLISH_MODE` to `linkedin` to post for real.")
         gh.add_labels(n, ["simulated"])
         gh.close(n)
         return True
+    data = None
+    if has_image:
+        try:
+            data = gh.raw_file(img["path"], img["branch"])
+        except (HttpError, OSError) as e:
+            return stop(f":x: Not published: I could not read the image ({str(e)[:150]}). Comment **`/image`** for a new one "
+                        f"or **`/image none`** to post without an image.\n\n{retry}")
     try:
-        urn, url, comment_error = linkedin.publish(post, link_line if mode == "auto" else None)
+        urn, url, comment_error = linkedin.publish(post, link_line if mode == "auto" else None, image=data, alt=img.get("alt", ""))
     except linkedin.LinkedInError as e:
         return stop(f":x: Not published: {e}\n\n{retry}")
     msg = f"{lead}:rocket: Published: {url or urn}"
@@ -228,11 +238,55 @@ def rewrite(cfg, issue, instruction):
                           instruction=instruction, current=current)
     except RuntimeError as e:
         return gh.comment(n, f":x: Rewrite failed: {e}. The draft is unchanged.")
-    gh.update_issue(n, body=gh.replace_parts(issue["body"], d.post_text_he, d.post_text))
-    notes = "".join(f"\n- {w}" for w in d.warnings)
+    body = gh.replace_parts(issue["body"], d.post_text_he, d.post_text)
+    warnings = list(d.warnings)
+    if gh.parse_image(body).get("kind") == "card":  # the card shows the headline and hook, so it is redrawn
+        try:
+            pic = images.make(cfg, "card", topic, d.post_text_he, d.post_text, load_profile())
+            body = gh.replace_image(body, images.store(cfg, pic, title_of(issue)))
+        except Exception as e:  # noqa: BLE001 - the rewrite itself succeeded
+            warnings.append(f"The card was not redrawn ({type(e).__name__}); comment `/image card` to try again.")
+    gh.update_issue(n, body=body)
+    notes = "".join(f"\n- {w}" for w in warnings)
     translated = " and translated" if d.post_text_he else ""
     gh.comment(n, f"Rewritten{translated} ({d.words} words, `{d.model}`). The issue text above now holds the new version."
                + (f"\n\n**Review notes:**{notes}" if notes else "") + "\n\n" + HELP)
+
+
+def title_of(issue):
+    return re.sub(r"^Post draft:\s*", "", issue.get("title") or "").strip() or "post"
+
+
+def image(cfg, issue, arg):
+    """/image [card|ai|none]: a new image of the same kind (a card if there was none), or switch kind."""
+    n, labels = issue["number"], {l["name"] for l in issue.get("labels", [])}
+    arg = arg.lower().strip()
+    if "published" in labels:
+        return gh.comment(n, "Already published, the image can't change now.")
+    if arg not in ("", "card", "ai", "none"):
+        return gh.comment(n, "Use **`/image`** for a new image, **`/image card`**, **`/image ai`** or **`/image none`**.")
+    body = issue.get("body") or ""
+    current = gh.parse_image(body).get("kind")
+    if arg == "none":
+        info, notes = {"kind": "none"}, []
+    else:
+        want = arg or (current if current in ("card", "ai") else "card")
+        topic = gh.parse_meta(body).get("topic") or {"kind": "news", "title": title_of(issue)}
+        he, en = gh.parse_parts(body)
+        if not en:
+            return gh.comment(n, ":x: No English text found in this draft, so I can't make an image for it.")
+        try:
+            pic = images.make(cfg, want, topic, he, en, load_profile())
+            info, notes = images.store(cfg, pic, title_of(issue)), pic.notes
+        except Exception as e:  # noqa: BLE001
+            return gh.comment(n, f":x: No new image: {type(e).__name__}: {str(e)[:200]}. The draft is unchanged.")
+    try:
+        new_body = gh.replace_image(body, info)
+    except ValueError:
+        return gh.comment(n, ":x: I can't find the post markers in this issue, so I can't attach an image.")
+    gh.update_issue(n, body=new_body)
+    said = {"none": "Image removed: the post goes out as text only.", "card": "New card above.", "ai": "New AI illustration above."}[info["kind"]]
+    gh.comment(n, said + "".join(f"\n- {x}" for x in notes))
 
 
 def main():
@@ -265,6 +319,8 @@ def main():
         save_example(issue, arg)
     elif cmd == "/rewrite":
         rewrite(cfg, issue, arg)
+    elif cmd == "/image":
+        image(cfg, issue, arg)
     else:
         gh.comment(number, f"Unknown command `{cmd}`. {HELP}")
 

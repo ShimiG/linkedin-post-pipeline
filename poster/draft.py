@@ -8,7 +8,7 @@ import os
 import sys
 from datetime import date, datetime, timezone
 
-from . import compose, gh, sources
+from . import compose, gh, images, sources
 from .config import load_config, load_profile, today
 
 DRY = os.environ.get("DRY_RUN") == "1"
@@ -25,8 +25,12 @@ class History:
 
     def __init__(self, issues, cooldown_days, now):
         self.skip_hn, self.skip_wiki, self.skip_otd, self.blocked_wiki, self.blocked_sites, kinds = set(), set(), set(), set(), set(), []
+        self.image_kinds = []  # newest first; drafts from before images have none and are left out
         for i in issues:
             labels = {l["name"] for l in i.get("labels", [])}
+            img = gh.parse_image(i.get("body"))
+            if img:
+                self.image_kinds.append(img.get("kind") or "none")
             t = gh.parse_meta(i.get("body")).get("topic", {})
             if t.get("kind") in KINDS:
                 kinds.append(t["kind"])  # newest first
@@ -109,6 +113,26 @@ def token_warnings(cfg):
     return [msg]
 
 
+def picture(cfg, h, topic, draft, profile, title, notes):
+    """Make and store the draft's image. Never stops the draft: a failure means no image and a review note."""
+    if not (cfg.get("images") or {}).get("enabled", True):
+        return None
+    want = images.choose(cfg, h.image_kinds)
+    try:
+        pic = images.make(cfg, want, topic, draft.post_text_he, draft.post_text, profile)
+        notes.extend(pic.notes)
+        if DRY:
+            path = os.path.join(os.environ.get("RUNNER_TEMP") or "/tmp", f"post-image.{pic.ext}")
+            with open(path, "wb") as f:
+                f.write(pic.data)
+            print(f"image ({pic.kind}) saved to {path}" + (f"; prompt: {pic.prompt}" if pic.prompt else ""))
+            return {"kind": pic.kind, "path": path, "branch": "local", "alt": pic.alt, "prompt": pic.prompt}
+        return images.store(cfg, pic, title)
+    except Exception as e:  # noqa: BLE001 - an image problem must never cost the draft
+        notes.append(f"No image: {type(e).__name__}: {str(e)[:200]}. Comment `/image` to try again.")
+        return {"kind": "none"}
+
+
 def main():
     cfg, profile = load_config(), load_profile()
     if not profile:
@@ -145,8 +169,9 @@ def main():
             gh.comment(topic["topic_issue"], f":warning: Could not draft this topic: {e}. It stays queued; edit the notes or try again.")
         sys.exit(str(e))
 
-    body = gh.render_draft(topic, news, draft, extra)
     title = f"Post draft: {topic['title']}"
+    image = picture(cfg, h, topic, draft, profile, topic["title"], extra)
+    body = gh.render_draft(topic, news, draft, extra, image=image)
     if DRY:
         print("=" * 72, "\n" + title + "\n", body, sep="\n")
         return

@@ -33,3 +33,15 @@ An "On this day" draft is tied to its date: `/approve` on any other month and da
 `/approve` does not re-run these checks: what you approve is what gets posted (Hebrew, separator, English), after a 3000-character limit check on the combined text. Edit the text by hand freely.
 
 `post.signature` (optional, default empty): a fixed last line, appended if missing and excluded from all checks.
+
+## Image checks (`poster/images.py`)
+
+Only for the AI illustration (about one draft in five); branded cards are drawn from the post's own headline and first paragraph, so they need none.
+
+1. **Topic words:** the post title and English text must contain none of `SENSITIVE_WORDS` (politics, conflict and violence, death, crime, drugs, alcohol and gambling, sex and nudity, religion and hate, and countries and groups at the centre of current conflicts). Whole words, any case.
+2. **Model verdict:** the prompt writer (`prompts/image-prompt.md`) must return `safe: true`. It is told to refuse rather than soften a sensitive topic.
+3. **Prompt words:** the image prompt it wrote must also pass the word check.
+4. **Fixed style:** code appends `STYLE` (no people, faces, text, logos, flags, national or religious symbols) to every prompt.
+5. **Blank image:** an almost uniform image (a tripped model filter) is refused.
+
+Any failure gives the draft a card instead, with the reason in the review notes. Every image is shown on the draft issue before you `/approve`.

@@ -1,12 +1,12 @@
 name: Review command
 
-# /approve, /schedule <dd/mm/yyyy HH:MM>, /unschedule, /reject, /rewrite <instruction> on an open `draft` issue; /block [site], /unblock and /example also on closed ones.
+# /approve, /schedule <dd/mm/yyyy HH:MM>, /unschedule, /reject, /rewrite <instruction>, /image [card|ai|none] on an open `draft` issue; /block [site], /unblock and /example also on closed ones.
 on:
   issue_comment:
     types: [created]
 
 permissions:
-  contents: write   # /example saves a file to examples/
+  contents: write   # /example saves a file to examples/, /image commits a new image
   issues: write
   actions: write    # /schedule switches on the "Publish scheduled posts" workflow
 
@@ -42,6 +42,8 @@ jobs:
           PROFILE_YML: ${{ secrets.PROFILE_YML }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
           LINKEDIN_PERSON_URN: ${{ secrets.LINKEDIN_PERSON_URN }}
           PUBLISH_MODE: ${{ vars.PUBLISH_MODE }}

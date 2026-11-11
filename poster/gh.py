@@ -1,4 +1,4 @@
-"""GitHub issues as the review board and the system of record (no database, no commits from the bot)."""
+"""GitHub issues as the review board and the system of record (no database). The bot only commits post images (to their own branch) and saved examples."""
 import base64
 import json
 import os
@@ -16,6 +16,8 @@ EN_START, EN_END = "<!-- post-en:start -->", "<!-- post-en:end -->"
 SECTION_START, SECTION_END = "<!-- post-section:start -->", "<!-- post-section:end -->"  # wraps the blocks + headings
 META_RE = re.compile(r"<!-- meta: (\{.*?\}) -->", re.S)
 PUBLISH_AT_RE = re.compile(r"\n*<!-- publish-at: (\S+) -->")                # set by /schedule, read by poster.scheduled
+IMG_START, IMG_END = "<!-- post-image:start -->", "<!-- post-image:end -->"  # the image shown on the issue and posted
+IMAGE_RE = re.compile(r"<!-- image: (\{.*?\}) -->", re.S)
 SCHEDULED_WORKFLOW = "scheduled.yml"
 LABELS = {
     "draft": ("0e8a16", "A post draft waiting for /approve, /schedule, /reject or /rewrite"),
@@ -103,10 +105,43 @@ def remove_label(number, label):
 
 def put_file(path, text, message, branch=None):
     """Create a file on the default branch through the Contents API (no checkout or git push needed)."""
-    body = {"message": message, "content": base64.b64encode(text.encode()).decode()}
+    return put_bytes(path, text.encode(), message, branch)
+
+
+def put_bytes(path, data, message, branch=None):
+    body = {"message": message, "content": base64.b64encode(data).decode()}
     if branch:
         body["branch"] = branch
     return call("PUT", f"/contents/{urllib.parse.quote(path)}", body)
+
+
+def ensure_branch(name):
+    """Create `name` from the default branch if it does not exist yet (post images live there, away from main)."""
+    try:
+        call("GET", f"/git/ref/heads/{urllib.parse.quote(name)}")
+        return
+    except HttpError as e:
+        if e.status != 404:
+            raise
+    default = call("GET", "")["default_branch"]
+    sha = call("GET", f"/git/ref/heads/{urllib.parse.quote(default)}")["object"]["sha"]
+    try:
+        call("POST", "/git/refs", {"ref": f"refs/heads/{name}", "sha": sha})
+    except HttpError as e:
+        if e.status != 422:  # 422 = created meanwhile
+            raise
+
+
+def raw_file(path, ref):
+    """A file's bytes from the repo (private repos included)."""
+    headers = {"Authorization": f"Bearer {_token()}", "Accept": "application/vnd.github.raw+json", "X-GitHub-Api-Version": "2022-11-28"}
+    url = f"{API}/repos/{repo()}/contents/{urllib.parse.quote(path)}?ref={urllib.parse.quote(ref)}"
+    return request("GET", url, headers=headers, binary=True, timeout=60)[2]
+
+
+def file_url(path, ref):
+    """A link that shows the image in issues to anyone who can see the repo."""
+    return f"https://github.com/{repo()}/blob/{urllib.parse.quote(ref)}/{urllib.parse.quote(path)}?raw=true"
 
 
 def close(number, reason="completed"):
@@ -172,7 +207,50 @@ def post_section(he, en):
     return f"{SECTION_START}\n{inner}\n{SECTION_END}"
 
 
-def render_draft(topic, news_items, draft, extra_warnings=()):
+def parse_image(body):
+    """The draft's image info ({kind, path, branch, alt, prompt}), or {} when it has none."""
+    m = IMAGE_RE.search(body or "")
+    if not m:
+        return {}
+    try:
+        return json.loads(m.group(1))
+    except json.JSONDecodeError:
+        return {}
+
+
+def image_section(info):
+    """The image block of an issue. `info` None means the draft has no image block at all (older drafts)."""
+    kind = (info or {}).get("kind") or "none"
+    if kind == "none":
+        inner = "**Image:** none, the post goes out as text only. **`/image`** adds a card, **`/image ai`** an AI illustration."
+    else:
+        what = "branded card" if kind == "card" else "AI illustration"
+        inner = (f"**Image** ({what}), posted with the text:\n\n"
+                 f"<img src=\"{file_url(info['path'], info['branch'])}\" width=\"420\" alt=\"post image\">")
+        if info.get("prompt"):
+            inner += f"\n\n<details><summary>Image prompt</summary>\n\n{info['prompt']}\n\n</details>"
+        if kind == "card":
+            inner += "\n\n_The card shows the headline and first paragraph. Edited them by hand? **`/image card`** redraws it._"
+        inner += ("\n\n**`/image`** makes a new one, **`/image card`** or **`/image ai`** switches the type, "
+                  "**`/image none`** posts without an image.")
+    data = json.dumps(info or {"kind": "none"}, ensure_ascii=False).replace("-->", "--&gt;")
+    return f"{IMG_START}\n{inner}\n<!-- image: {data} -->\n{IMG_END}"
+
+
+def replace_image(body, info):
+    """The issue body with its image block swapped (or added after the post, for drafts made before images)."""
+    body = body or ""
+    if IMG_START in body and IMG_END in body:
+        a, rest = body.split(IMG_START, 1)
+        _, b = rest.split(IMG_END, 1)
+        return f"{a}{image_section(info)}{b}"
+    if SECTION_END in body:
+        a, b = body.split(SECTION_END, 1)
+        return f"{a}{SECTION_END}\n\n{image_section(info)}{b}"
+    raise ValueError("no post markers in the issue body")
+
+
+def render_draft(topic, news_items, draft, extra_warnings=(), image=None):
     kind_label = {"news": "AI news", "fact": "Coding fact", "onthisday": "On this day", "queued": "Your topic"}[topic["kind"]]
     src = topic.get("source_url")
     head = [f"**{kind_label}**", f"model `{draft.model}` (attempt {draft.attempt})", f"{draft.words} words (English)"]
@@ -183,6 +261,8 @@ def render_draft(topic, news_items, draft, extra_warnings=()):
         lines += [f"**Source:** [{topic['title']}]({src})" + (f" · [HN discussion]({topic['discussion_url']})" if topic.get("discussion_url") else ""), ""]
     lines += ["The post. The notes in _italics_ are only for you; everything between the markers is posted. Edit it by hand if you like:", "",
               post_section(draft.post_text_he, draft.post_text), ""]
+    if image is not None:
+        lines += [image_section(image), ""]
     warnings = list(draft.warnings) + list(extra_warnings)
     if warnings:
         lines += ["> [!WARNING]", "> **Review notes**"] + [f"> - {w}" for w in warnings] + [""]
