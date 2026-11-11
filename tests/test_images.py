@@ -228,3 +228,7 @@ def test_linkedin_uploads_then_references_the_image(monkeypatch):
 def test_characters_without_glyphs_are_replaced():
     assert images.headline_of("נלחם ב‑ALS‏") == "נלחם ב-ALS"
     assert images.hook_of("a 31.2‑second flight") == "a 31.2-second flight"
+
+
+def test_fonts_use_basic_layout_so_hebrew_is_not_reversed_twice():
+    assert images._font(40).layout_engine == images.ImageFont.Layout.BASIC

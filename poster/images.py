@@ -140,7 +140,9 @@ def hook_of(en):
 
 # --------------------------------------------------------------------------- the card
 def _font(size, weight="Bold"):
-    f = ImageFont.truetype(str(FONT), size)
+    # BASIC layout: Pillow does no bidi of its own, so python-bidi alone orders the Hebrew. With Pillow's raqm engine
+    # (present on Linux runners, not on a default Mac) the text would be reversed twice.
+    f = ImageFont.truetype(str(FONT), size, layout_engine=ImageFont.Layout.BASIC)
     try:
         f.set_variation_by_name(weight)
     except (OSError, ValueError):

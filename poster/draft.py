@@ -170,7 +170,7 @@ def main():
         sys.exit(str(e))
 
     title = f"Post draft: {topic['title']}"
-    image = picture(cfg, h, topic, draft, profile, title, extra)
+    image = picture(cfg, h, topic, draft, profile, topic["title"], extra)
     body = gh.render_draft(topic, news, draft, extra, image=image)
     if DRY:
         print("=" * 72, "\n" + title + "\n", body, sep="\n")
