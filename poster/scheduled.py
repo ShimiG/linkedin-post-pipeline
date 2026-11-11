@@ -13,25 +13,27 @@ from .http import HttpError
 
 
 def run(cfg, at):
-    """Publish every open draft that is due at `at`. Returns (still waiting, failed)."""
+    """Publish every scheduled version that is due at `at`. Returns (drafts still waiting, failed)."""
     waiting = failed = 0
     for issue in gh.issues("scheduled", state="open"):
         n, labels = issue["number"], {l["name"] for l in issue.get("labels", [])}
         if "draft" not in labels:
             continue
-        when = gh.publish_at(issue.get("body"))
-        if when and when > at:
+        times = gh.schedules(issue.get("body"))
+        due = sorted(((when, lang) for lang, when in times.items() if when <= at), key=lambda d: d[0])
+        if len(due) < len(times):
             waiting += 1
-            continue
         try:
-            # Take the draft off the schedule before posting: whatever goes wrong after this, it is never posted twice.
-            review.clear_schedule(issue)
-            if not when:
+            if not times:
+                review.clear_schedule(issue)
                 gh.comment(n, ":warning: This draft was labelled `scheduled` but its time is gone (the hidden `publish-at` line "
                               "was removed from the issue text). Nothing was posted. " + review.SCHEDULE_CANCELLED)
                 continue
-            print(f"#{n}: scheduled for {when.isoformat()}, publishing")
-            review.approve(cfg, issue, scheduled=True)
+            for when, lang in due:
+                # Take the version off the schedule before posting: whatever goes wrong after this, it is never posted twice.
+                review.clear_schedule(issue, lang)
+                print(f"#{n}: {lang} scheduled for {when.isoformat()}, publishing")
+                review.approve(cfg, issue, lang, scheduled=True)
         except Exception as e:  # keep going: one broken draft must not hold back the others
             failed += 1
             print(f"#{n}: failed: {e}")

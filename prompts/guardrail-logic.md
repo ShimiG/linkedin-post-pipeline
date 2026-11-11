@@ -7,6 +7,7 @@ Allowed facts come from: the profile keys given to the model, the topic title an
 Checks, in order (the first failure wins; each failure is retried up to `llm.max_attempts` with the offending items named in the prompt):
 1. `llm_error`: provider error, non-JSON answer, or empty `post_text`. The next attempt switches provider (Groq and Gemini).
 2. `too_long`: longer than `post.max_chars` (default 1300; LinkedIn allows 3000).
+   `hook_too_long`: the first line is longer than `post.hook_max_chars` (140), about what phones show before "...see more". The retry asks for a first line of at most 120 characters.
 3. `contains_url`: any link in the post body. Links cut reach, so the source goes in the first comment instead.
 4. `fact_check`: every numeric token in the post must normalise to a number present in the sources. Token rule: a digit not glued to a letter, optional `K/M/B` suffix not followed by a letter, or the words thousand/million/billion; commas, `+` and `#` stripped. So "B2B" is not a number, "1.1 million" equals "1.1M", and the current year is allowed.
 5. `unverified_source`: a known outlet or company (TechCrunch, Reuters, The Verge, Bloomberg, Wired, GitHub, Stack Overflow, Hacker News, Wikipedia and others) named in the post must appear in the sources.
@@ -18,7 +19,10 @@ Checks, in order (the first failure wins; each failure is retried up to `llm.max
 After the English passes, the Hebrew translation is checked the same way, retried up to `llm.max_attempts` times:
 1. `contains_url` / `hashtags_in_translation`: no links, and no hashtags (the English part keeps them).
 2. `not_hebrew`: at least half of the letters must be Hebrew (English technical terms are fine).
-3. `fact_check`: every number in the Hebrew must be a number of the English post. The translator may not add, round or convert numbers.
+3. `translatorese`: none of the English clichés carried into Hebrew word for word (`TRANSLATORESE`: בסופו של יום, המסע המקצועי, משנה משחק, נרגש לשתף…) and no gender written with a slash (עשה/י, מפתח/ת). The retry asks for direct Hebrew that addresses the reader in the plural.
+4. `fact_check`: every number in the Hebrew must be a number of the English post. The translator may not add, round or convert numbers.
+
+Formal words (על מנת, כמו כן, יתרה מכך, אי לכך) do not fail the check; they become a review note with the everyday word to use.
 
 The Hebrew headline (`check_headline`) gets the same checks, plus: present, one line, at most 90 characters. A rejected headline retries the translation with the reason named.
 

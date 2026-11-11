@@ -194,7 +194,7 @@ def main():
 
     title = f"Post draft: {topic['title']}"
     image = picture(cfg, h, topic, draft, profile, topic["title"], extra)
-    body = gh.render_draft(topic, news, draft, extra, image=image)
+    body = gh.render_draft(topic, news, draft, extra, image=image, separate=compose.separate(cfg))
     if DRY:
         print("=" * 72, "\n" + title + "\n", body, sep="\n")
         return

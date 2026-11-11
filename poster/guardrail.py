@@ -124,7 +124,7 @@ def copied_phrase(post, examples, n=8):
     return ""
 
 
-def check(post, *, author, topic, news_items, today, max_chars, max_hashtags, signature="", examples=(), copy_ngram=8):
+def check(post, *, author, topic, news_items, today, max_chars, max_hashtags, signature="", examples=(), copy_ngram=8, hook_max=0):
     post = tidy(post)
     if not post:
         return Result(False, "llm_error", message="empty post_text")
@@ -133,6 +133,9 @@ def check(post, *, author, topic, news_items, today, max_chars, max_hashtags, si
     fail = lambda reason, off, msg: Result(False, reason, off, msg, post)
     if len(post) > max_chars:
         return fail("too_long", [], f"too_long: {len(post)} > {max_chars}")
+    hook = post.split("\n", 1)[0].strip()
+    if hook_max and len(hook) > hook_max:  # phones show about this much before "...see more"
+        return fail("hook_too_long", [hook], f"hook_too_long: first line is {len(hook)} > {hook_max} characters")
     body = post.replace(signature, "") if signature else post
 
     urls = [m.group(0) for m in URL_RE.finditer(body)]
@@ -184,12 +187,29 @@ def retry_note(res):
         return f"\n\nYour previous draft {why}: {', '.join(res.offending)}. Do not use them. Rewrite the post using only facts from the input."
     if res.reason == "too_long":
         return f"\n\nYour previous draft was too long ({res.message}). Rewrite it in at most 110 words."
+    if res.reason == "hook_too_long":
+        return (f"\n\nYour previous first line was too long ({res.message}). Phones show only about 140 characters before "
+                "\"...see more\". Make the first paragraph one short sentence of at most 120 characters, and move the rest down.")
     return "\n\nYour previous answer was not valid JSON or failed. Return the JSON object only."
 
 
 # --------------------------------------------------------------------------- translation
 HEBREW_RE = re.compile(r"[֐-׿]")
 LATIN_RE = re.compile(r"[A-Za-z]")
+# Translatorese: English clichés carried into Hebrew word for word. A translation with one of them is sent back.
+TRANSLATORESE = ("בעולם המשתנה", "בעולם הדינמי", "בעולם של היום", "בסופו של יום", "המסע המקצועי", "המסע שלי",
+                 "משנה משחק", "משנה את כללי המשחק", "נרגש לשתף", "נרגשת לשתף", "נרגש להודיע", "נרגשת להודיע",
+                 "גאה להודיע", "גאה לשתף", "בואו נדבר על", "צלילה לעומק", "צוללים לעומק", "נצלול לעומק")
+# "עשה/י", "מנהל/ת": gender written with a slash. Address the reader in the plural instead.
+SLASH_GENDER_RE = re.compile(r"[א-ת]+/(?:ת|י|ה|ית|ות|ים|ן)(?![א-ת])")
+# Stiff, formal words: allowed, but the reviewer is told (the prompt asks for the everyday word).
+FORMAL = {"על מנת": "כדי", "כמו כן": "וגם", "יתרה מכך": "ועוד", "אי לכך": "לכן", "הנני": "אני"}
+
+
+def formal_words(he):
+    """Review notes for formal words in the Hebrew text, with the everyday word to use instead."""
+    found = [f"{w} (better: {alt})" for w, alt in FORMAL.items() if w in (he or "")]
+    return ["formal wording, consider: " + ", ".join(found)] if found else []
 
 
 def check_translation(he, en, *, today):
@@ -204,6 +224,9 @@ def check_translation(he, en, *, today):
     tags = [t.strip() for t in HASHTAG_RE.findall(he)]
     if tags:
         return fail("hashtags_in_translation", tags, "hashtags_in_translation: " + ", ".join(tags))
+    stiff = [p for p in TRANSLATORESE if p in he] + SLASH_GENDER_RE.findall(he)
+    if stiff:
+        return fail("translatorese", stiff, "translatorese: " + ", ".join(stiff))
     heb, lat = len(HEBREW_RE.findall(he)), len(LATIN_RE.findall(he))
     if heb < 0.5 * (heb + lat):
         return fail("not_hebrew", [he[:60]], f"not_hebrew: only {heb} of {heb + lat} letters are Hebrew")
@@ -247,6 +270,10 @@ def translation_retry_note(res):
         return f"\n\nYour previous translation contained numbers that are not in the English post: {', '.join(res.offending)}. Keep exactly the numbers of the English post."
     if res.reason == "not_hebrew":
         return "\n\nYour previous translation left these parts in English: " + " | ".join(res.offending) + ". Translate every paragraph, including the closing question, into Hebrew."
+    if res.reason == "translatorese":
+        return ("\n\nYour previous translation used " + ", ".join(res.offending) + ". These are English phrases translated word for word "
+                "(or gender written with a slash). Say it the way an Israeli would write it: concrete and direct, and address the "
+                "reader in the plural (תבדקו, נסו) instead of forms like עשה/י.")
     if res.reason in ("contains_url", "hashtags_in_translation"):
         return f"\n\nYour previous translation included {', '.join(res.offending)}. Leave out links and hashtags."
     return "\n\nYour previous answer was not valid JSON. Return the JSON object only."

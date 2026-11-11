@@ -26,6 +26,17 @@ def host(url):
 
 
 # --------------------------------------------------------------------------- Hacker News
+def on_topic(title, words):
+    """True when the title has one of `words` as a whole word (plural allowed). Hacker News search also matches word
+    prefixes, so the query "AI" finds "Airplanes"; this keeps only stories that are really about the topic.
+    ALL-CAPS words (AI, LLM, GPT) must match exactly, the rest ignore case."""
+    for w in words:
+        flags = 0 if w.isupper() else re.I
+        if re.search(rf"(?<![A-Za-z]){re.escape(w)}s?(?![a-z])", title or "", flags):
+            return True
+    return False
+
+
 def hn_candidates(cfg, used_ids, now=None, blocked_sites=()):
     """Recent AI stories with an external link, most points first, skipping drafted stories and blocked websites."""
     n = cfg["news"]
@@ -47,6 +58,8 @@ def hn_candidates(cfg, used_ids, now=None, blocked_sites=()):
                 continue
             if host(h["url"]) in ("github.com", "youtube.com", "twitter.com", "x.com"):
                 continue  # repos and videos rarely give a readable article body
+            if not on_topic(h.get("title", ""), n.get("title_words") or n["queries"]):
+                continue
             seen[sid] = {
                 "hn_id": sid, "title": h.get("title", ""), "url": h["url"], "source": host(h["url"]),
                 "points": int(h.get("points") or 0), "comments": int(h.get("num_comments") or 0),
