@@ -61,13 +61,30 @@ def _explain(e):
     return str(e)
 
 
-def publish(text, first_comment=None):
-    """Returns (post_urn, post_url, comment_error_or_None)."""
+def upload_image(token, author, data):
+    """Images API: register an upload, PUT the bytes, return the image URN to reference from the post."""
+    try:
+        _, _, init = request("POST", f"{API}/rest/images?action=initializeUpload", headers=_headers(token),
+                             body={"initializeUploadRequest": {"owner": author}})
+        value = init["value"]
+        request("PUT", value["uploadUrl"], headers={"Authorization": f"Bearer {token}", "Content-Type": "application/octet-stream"},
+                body=data, timeout=120, raw=True)
+    except HttpError as e:
+        raise LinkedInError(f"image upload failed: {_explain(e)}") from None
+    except (KeyError, TypeError):
+        raise LinkedInError("image upload failed: LinkedIn did not return an upload URL") from None
+    return value["image"]
+
+
+def publish(text, first_comment=None, image=None, alt=""):
+    """Post `text` (with `image` bytes attached, if given). Returns (post_urn, post_url, comment_error_or_None)."""
     token = _token()
     author = person_urn(token)
     body = {"author": author, "commentary": little_text(text), "visibility": "PUBLIC",
             "distribution": {"feedDistribution": "MAIN_FEED", "targetEntities": [], "thirdPartyDistributionChannels": []},
             "lifecycleState": "PUBLISHED", "isReshareDisabledByAuthor": False}
+    if image:
+        body["content"] = {"media": {"id": upload_image(token, author, image), "altText": (alt or "")[:4000]}}
     try:
         _, headers, _ = request("POST", f"{API}/rest/posts", headers=_headers(token), body=body)
     except HttpError as e:

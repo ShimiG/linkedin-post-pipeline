@@ -12,8 +12,8 @@ class HttpError(Exception):
         self.status, self.body, self.url = status, body, url
 
 
-def request(method, url, *, headers=None, body=None, timeout=30, raw=False):
-    """Returns (status, headers, parsed_json_or_text). Raises HttpError on 4xx/5xx."""
+def request(method, url, *, headers=None, body=None, timeout=30, raw=False, binary=False):
+    """Returns (status, headers, parsed_json_or_text), or the body as bytes with binary=True. Raises HttpError on 4xx/5xx."""
     h = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     h.update(headers or {})
     data = None
@@ -23,11 +23,15 @@ def request(method, url, *, headers=None, body=None, timeout=30, raw=False):
     req = urllib.request.Request(url, data=data, headers=h, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            text = r.read().decode(r.headers.get_content_charset() or "utf-8", "replace")
+            content = r.read()
+            charset = r.headers.get_content_charset() or "utf-8"
             resp_headers = {k.lower(): v for k, v in r.headers.items()}
             status = r.status
     except urllib.error.HTTPError as e:
         raise HttpError(e.code, e.read().decode("utf-8", "replace"), url) from None
+    if binary:
+        return status, resp_headers, content
+    text = content.decode(charset, "replace")
     if raw or not text:
         return status, resp_headers, text
     try:

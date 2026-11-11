@@ -28,6 +28,17 @@ post:
   #   off:    no source link
   source_link: manual
 
+# The picture posted with each draft. Most get a branded card (Hebrew headline + English hook on the brand gradient);
+# about one in `ai_every` gets an AI illustration of the topic instead, made by Cloudflare Workers AI (free daily
+# allowance; needs the CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets). Sensitive topics (politics, war,
+# crime, death, sex, religion...) always get a card: see poster/images.py and prompts/image-prompt.md.
+images:
+  enabled: true
+  ai_every: 5                  # 0 = cards only
+  ai_model: "@cf/black-forest-labs/flux-1-schnell"
+  ai_steps: 4
+  branch: post-images          # images are committed here, not to main
+
 # Each post is written in English, translated, and published as one post: translation first, then the English.
 bilingual:
   enabled: true

@@ -163,7 +163,7 @@ def board(monkeypatch):
     log = []
     for name in ("comment", "add_labels", "close"):
         monkeypatch.setattr(gh, name, lambda *a, _n=name, **k: log.append((_n, a, k)))
-    monkeypatch.setattr(linkedin, "publish", lambda *a: pytest.fail("must not publish"))
+    monkeypatch.setattr(linkedin, "publish", lambda *a, **k: pytest.fail("must not publish"))
     return log
 
 

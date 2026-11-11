@@ -13,7 +13,7 @@ on:
         default: auto
 
 permissions:
-  contents: read
+  contents: write   # post images are committed to the post-images branch
   issues: write
 
 concurrency:
@@ -39,6 +39,8 @@ jobs:
           PROFILE_YML: ${{ secrets.PROFILE_YML }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           PUBLISH_MODE: ${{ vars.PUBLISH_MODE }}
           TIMEZONE: ${{ vars.TIMEZONE }}
           LINKEDIN_TOKEN_EXPIRES: ${{ vars.LINKEDIN_TOKEN_EXPIRES }}
