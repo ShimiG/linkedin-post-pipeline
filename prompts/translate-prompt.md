@@ -16,7 +16,7 @@ Rules:
   - open source -> קוד פתוח; machine learning -> למידת מכונה; database -> מסד נתונים;
   - developer -> מפתח; code -> קוד; feature -> יכולת; deploy -> פריסה; bug -> תקלה.
 - Do not write an English word in Hebrew letters when a real Hebrew word exists (תכונה or יכולת, not פיצ'ר).
-- List in notes every word you kept in English.
+- In notes, list the words you kept in English as one note, comma-separated (not one note per word).
 - Keep every number exactly as it appears in the English text, as digits. Do not add, remove, round or convert any number. Do not turn words like "tripled" into digits.
 - Keep the same paragraphs, separated by one blank line (\n\n), and the same closing question.
 - No hashtags (the English part keeps them), no links, no markdown, no em-dashes, no exclamation marks.
