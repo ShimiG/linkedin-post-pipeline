@@ -77,7 +77,8 @@ news:
   title_words: [AI, LLM, OpenAI, Anthropic, Claude, Gemini, GPT, ChatGPT, Copilot, DeepSeek, Mistral, Llama, "machine learning", "neural network", agent]
   max_candidates: 8            # stories tried, best first, until one has a readable article
 
-# "On this day" posts: something that happened on today's date in an earlier year, from Wikipedia's On this day list.
+# "On this day" posts: something that happened on a date in an earlier year, from Wikipedia's On this day list. The date
+# is the next posting day (see posting:) after the draft is made with no other post published or scheduled on it.
 # Only entries that match a keyword are used; on a date with no match the run moves on to the next kind in the rotation.
 on_this_day:
   sections: [selected, events, births, deaths]   # which lists to read; on equal relevance, earlier ones win

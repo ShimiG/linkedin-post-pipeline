@@ -9,8 +9,8 @@ import os
 import sys
 from datetime import date, datetime, timezone
 
-from . import compose, gh, images, sources
-from .config import load_config, load_profile, today
+from . import compose, gh, images, sources, timing
+from .config import load_config, load_profile, today, tz
 
 DRY = os.environ.get("DRY_RUN") == "1"
 KINDS = ("news", "fact", "onthisday")   # the automatic kinds config.yml -> rotation may list
@@ -29,8 +29,15 @@ class History:
         self.skip_hn, self.skip_wiki, self.skip_otd, self.blocked_wiki, self.blocked_sites, kinds = set(), set(), set(), set(), set(), []
         self.image_kinds = []  # newest first; drafts from before images have none and are left out
         self.repo_drafted, self.blocked_repos = {}, set()  # project posts: repo -> newest draft time; repos never to pick at random
+        self.busy = []  # when posts went out or are scheduled to (aware datetimes): those days are not open
         for i in issues:
             labels = {l["name"] for l in i.get("labels", [])}
+            body = i.get("body") or ""
+            self.busy += list(gh.published_times(body).values())
+            if i.get("state", "open") == "open":
+                self.busy += list(gh.schedules(body).values())
+            if "published" in labels and i.get("closed_at"):  # the last version out closes the draft
+                self.busy.append(datetime.fromisoformat(i["closed_at"].replace("Z", "+00:00")))
             img = gh.parse_image(i.get("body"))
             if img:
                 self.image_kinds.append(img.get("kind") or "none")
@@ -63,6 +70,16 @@ class History:
         self.last_kind = kinds[0] if kinds else None
 
 
+def taken_days(cfg, h):
+    return {w.astimezone(tz(cfg)).date() for w in h.busy}
+
+
+def otd_day(cfg, h):
+    """The day an "On this day" post is written for: the next posting day with no other post on it (not today)."""
+    langs = ("he", "en") if compose.separate(cfg) and compose.bilingual(cfg)[0] else ("he",)
+    return timing.open_day(cfg, today(cfg), taken_days(cfg, h), langs)
+
+
 def history(cfg):
     days = int((cfg.get("review") or {}).get("reject_cooldown_days", 7))
     return History(gh.issues("draft"), days, datetime.now(timezone.utc))
@@ -89,7 +106,7 @@ def pick(cfg, h, kind):
     if kind == "news":
         return sources.pick_news(cfg, h.skip_hn, h.blocked_sites)
     if kind == "onthisday":
-        return sources.pick_onthisday(cfg, h.skip_otd, today(cfg))
+        return sources.pick_onthisday(cfg, h.skip_otd, otd_day(cfg, h))
     if kind == "fact":
         return sources.pick_fact(cfg, h.skip_wiki, blocked=h.blocked_wiki)
     if kind in MANUAL_KINDS:
@@ -182,7 +199,8 @@ def main():
     extra = token_warnings(cfg)
     if topic["kind"] == "onthisday":
         d = date.fromisoformat(topic["otd_date"])
-        extra.append(f"This post is tied to {d.day} {d.strftime('%B')}. Approve it that day; after it, `/approve` asks you to confirm.")
+        extra.append(f"Written for {d.strftime('%A')} {d.day} {d.strftime('%B')}, the next posting day with nothing else on it. "
+                     "**`/schedule next`** posts it in that day's slot; on another day `/approve` asks you to confirm.")
     if topic["kind"] == "queued" and not profile:
         extra.append("Your topic was drafted without a profile, so the model only had the title and notes.")
     try:

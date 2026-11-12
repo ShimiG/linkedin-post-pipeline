@@ -56,3 +56,34 @@ def next_slot(cfg, lang, now, avoid_days=()):
         if soon < end:
             return soon
     return None
+
+
+def slot_days(cfg, langs):
+    """Weekday names ("mon"...) on which every version in `langs` has a slot."""
+    s = settings(cfg)
+    return set.intersection(*({d.strip().lower()[:3] for d in s[l]["days"]} for l in langs))
+
+
+def open_day(cfg, today, taken=(), langs=("he",)):
+    """The first day after `today` with a slot for every version in `langs` and no other post published or
+    scheduled (`taken`, dates). An "On this day" draft is written for this day, so there is time to review it."""
+    days = slot_days(cfg, langs) or slot_days(cfg, ("he",))
+    first = None
+    for i in range(1, 22):
+        d = today + timedelta(days=i)
+        if DAYS[d.weekday()] in days:
+            first = first or d
+            if d not in taken:
+                return d
+    return first or today + timedelta(days=1)
+
+
+def slot_on(cfg, lang, day, now):
+    """The good time to publish `lang` on `day` (a date), not before `now` (aware): that version's slot, or the
+    Hebrew slot when the version has none that day. None when the day's slots are over."""
+    start = max(now, datetime(day.year, day.month, day.day, tzinfo=now.tzinfo))
+    for l in dict.fromkeys(("en" if lang == "en" else "he", "he")):
+        at = next_slot(cfg, l, start)
+        if at and at.date() == day:
+            return at
+    return None
