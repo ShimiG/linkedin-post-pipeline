@@ -2,7 +2,7 @@
 
 Cheap, explainable checks that run on every draft and every `/rewrite` before it reaches the issue. No second LLM call.
 
-Allowed facts come from: the profile keys given to the model, the topic title and angle, every field of every source item (title, snippet, date, discussion line, and for "On this day" posts `years_ago`), and today's year, month and day.
+Allowed facts come from: the profile keys given to the model, the topic title and angle, every field of every source item (title, snippet, date, discussion line, and for "On this day" posts `years_ago`), and today's year, month and day (for an "On this day" post, the day it is written for).
 
 Checks, in order (the first failure wins; each failure is retried up to `llm.max_attempts` with the offending items named in the prompt):
 1. `llm_error`: provider error, non-JSON answer, or empty `post_text`. The next attempt switches provider (Groq and Gemini).
@@ -30,7 +30,7 @@ If no translation passes, the draft still opens with the English only and a revi
 
 Not failures, just review notes on the issue: the model's own warnings, and LinkedIn token expiry.
 
-An "On this day" draft is tied to its date: `/approve` on any other month and day posts nothing and asks for `/approve anyway`, so a stale "on this day" is never published by accident.
+An "On this day" draft is written for the next free posting day after it is made (`timing.open_day`) and is tied to that date: `/approve` on any other month and day posts nothing and asks for `/approve anyway`, so a stale "on this day" is never published by accident.
 
 `/schedule dd/mm/yyyy HH:MM` is a delayed `/approve`: it checks the time (valid, in the future), the post (present, at most 3000 characters) and, for an "On this day" draft, that the day matches. At the scheduled time the draft is first taken off the schedule and then published, so a failure is reported once and never retried, and a post cannot go out twice.
 

@@ -37,6 +37,16 @@ def parse_command(text):
     return cmd.lower(), arg.strip()
 
 
+def otd_day(topic):
+    """The day an "On this day" draft is written for, or None."""
+    if topic.get("kind") != "onthisday" or not topic.get("otd_date"):
+        return None
+    try:
+        return date.fromisoformat(topic["otd_date"])
+    except ValueError:
+        return None
+
+
 def off_date(cfg, topic, on=None):
     """The date an "On this day" draft was written for, when that is not the month and day of `on` (today); else ''."""
     if topic.get("kind") != "onthisday" or not topic.get("otd_date"):
@@ -136,6 +146,12 @@ def approve(cfg, issue, arg="", scheduled=False):
     topic = gh.parse_meta(issue.get("body")).get("topic", {})
     written_for = off_date(cfg, topic)
     if written_for and not anyway and not scheduled:  # a scheduled post was checked against its date by /schedule
+        day = otd_day(topic)
+        if day and day > today(cfg):
+            slot = timing.slot_on(cfg, lang, day, datetime.now(tz(cfg)))
+            when = when_text(cfg, slot) if slot else written_for
+            return stop(f":calendar: This is an \"On this day\" post written for {written_for}. Nothing was posted. "
+                        f"**`/schedule{word} next`** posts it on {when}, or edit the opening so it is true today and comment **`/approve{word} anyway`**.")
         return stop(f":calendar: This is an \"On this day\" post written for {written_for}, and that is not today. "
                     f"Nothing was posted. Edit the opening so it is still true and comment **`/approve{word} anyway`**, or **`/reject`**.")
     now = datetime.now(tz(cfg))
@@ -187,12 +203,16 @@ def approve(cfg, issue, arg="", scheduled=False):
     msg += REPLY_TIP
     left = sorted(remaining(issue) - posted)
     if left:
-        other = left[0]
-        slot = timing.next_slot(cfg, other, now, avoid_days={now.date()})
+        other, day = left[0], otd_day(topic)
+        if day:  # "On this day": both versions belong to that day
+            slot = timing.slot_on(cfg, other, now.date(), now)
+            why = "(the same day: it is an \"On this day\" post)"
+        else:
+            slot = timing.next_slot(cfg, other, now, avoid_days={now.date()})
+            why = "(another day reaches more people than both on the same day)"
         when = f" on {when_text(cfg, slot)}" if slot else ""
         msg += (f"\n\n**Still to post:** the {compose.LANG_NAME[other]} version. **`/schedule {WORD[other]} next`** posts it{when} "
-                f"(another day reaches more people than both on the same day), **`/approve {WORD[other]}`** posts it now. "
-                "If you don't want it, close this issue.")
+                f"{why}, **`/approve {WORD[other]}`** posts it now. If you don't want it, close this issue.")
     gh.comment(n, msg)
     new_labels = ["published"] + ([] if lang == "both" else [f"published-{lang}"])
     gh.add_labels(n, new_labels)
@@ -243,7 +263,13 @@ def schedule(cfg, issue, arg):
     if already(issue, lang):
         return gh.comment(n, "Already published, nothing to do.")
     current = datetime.now(tz(cfg))
-    if rest.lower() == "next":
+    day = otd_day(gh.parse_meta(issue.get("body")).get("topic", {}))
+    if rest.lower() == "next" and day:  # "On this day": the slot on the day it was written for
+        when = timing.slot_on(cfg, lang, day, current)
+        if not when:
+            return gh.comment(n, f":calendar: This is an \"On this day\" post written for {day.day} {day.strftime('%B')}, and that day's "
+                                 f"posting time is over. Edit the opening so it is still true and give a time: **`/schedule{word} dd/mm/yyyy HH:MM anyway`**, or **`/reject`**.")
+    elif rest.lower() == "next":
         body = issue.get("body") or ""
         others = [w for v, w in {**gh.published_times(body), **gh.schedules(body)}.items() if v not in (lang, "both")]
         when = timing.next_slot(cfg, lang, current, avoid_days={w.astimezone(tz(cfg)).date() for w in others})

@@ -3,6 +3,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import date
 
 from . import examples as examples_mod
 from . import guardrail, llm
@@ -114,9 +115,11 @@ def hebrew_part(cfg, headline, body):
     return f"{top}\n\n{body}"
 
 
-def translate(cfg, english):
-    """English post -> Hebrew, checked. Returns (hebrew, model, notes). Raises RuntimeError when no attempt passes."""
+def translate(cfg, english, day=None):
+    """English post -> Hebrew, checked. Returns (hebrew, model, notes). Raises RuntimeError when no attempt passes.
+    `day` is the day the post is written for (its date numbers are allowed); today when not given."""
     L = cfg["llm"]
+    day = day or today(cfg)
     _, language = bilingual(cfg)
     s = prompt_text("translate-prompt.md")
     system = s.split("<!-- TRANSLATE PROMPT START -->", 1)[1].split("<!-- TRANSLATE PROMPT END -->", 1)[0].strip()
@@ -136,9 +139,9 @@ def translate(cfg, english):
             provider = providers[1] if provider == providers[0] else providers[0]
             note = ""
             continue
-        res = guardrail.check_translation(out.get("post_text_he", ""), english, today=today(cfg))
+        res = guardrail.check_translation(out.get("post_text_he", ""), english, today=day)
         if res.ok and headline_on:
-            hres = guardrail.check_headline(out.get("headline_he", ""), english, today=today(cfg))
+            hres = guardrail.check_headline(out.get("headline_he", ""), english, today=day)
             if hres.ok:
                 return hebrew_part(cfg, hres.post_text, res.post_text), model, notes_of(out) + guardrail.formal_words(res.post_text)
             res = hres
@@ -150,13 +153,13 @@ def translate(cfg, english):
     raise RuntimeError(f"translation failed after {L['max_attempts']} attempts; last: {last}")
 
 
-def add_translation(cfg, draft):
+def add_translation(cfg, draft, day=None):
     """Fill draft.post_text_he. A failed translation never loses the English draft: it becomes a review note."""
     on, language = bilingual(cfg)
     if not on:
         return draft
     try:
-        draft.post_text_he, draft.translation_model, notes = translate(cfg, draft.post_text)
+        draft.post_text_he, draft.translation_model, notes = translate(cfg, draft.post_text, day)
         draft.warnings += [f"Translation: {n}" for n in notes if n.strip().lower().strip(".") not in EMPTY_NOTES]
     except RuntimeError as e:
         draft.warnings.append(f"{language} translation failed ({e}). Only the English text will be posted; comment /rewrite to try again.")
@@ -169,10 +172,20 @@ def add_translation(cfg, draft):
     return draft
 
 
+def post_day(cfg, topic):
+    """The day the post is written for: an "On this day" draft's date (a later posting day), else today."""
+    if topic.get("kind") == "onthisday" and topic.get("otd_date"):
+        try:
+            return date.fromisoformat(topic["otd_date"])
+        except ValueError:
+            pass
+    return today(cfg)
+
+
 def payload(cfg, author, topic, news_items):
     news = [{k: (str(v)[:NEWS_SNIPPET_CHARS] if k == "snippet" else v) for k, v in n.items() if k != "url"} for n in news_items]
     return {"author": author, "topic": {"title": topic["title"], "category": topic["category"], "angle": topic.get("angle", "")},
-            "news": news, "has_news": bool(news), "today": today(cfg).isoformat()}
+            "news": news, "has_news": bool(news), "today": post_day(cfg, topic).isoformat()}
 
 
 def rewrite_message(instruction, current, data):
@@ -210,7 +223,7 @@ def write(cfg, author, topic, news_items, *, instruction=None, current=None, exa
             provider = providers[1] if provider == providers[0] else providers[0]  # fail over
             note = ""
             continue
-        res = guardrail.check(out.get("post_text", ""), author=author, topic=topic, news_items=news_items, today=today(cfg),
+        res = guardrail.check(out.get("post_text", ""), author=author, topic=topic, news_items=news_items, today=post_day(cfg, topic),
                               max_chars=P["max_chars"], max_hashtags=P["max_hashtags"], signature=P.get("signature") or "",
                               hook_max=int(P.get("hook_max_chars") or 0),
                               examples=ex, copy_ngram=int((cfg.get("examples") or {}).get("copy_ngram", 8)))
@@ -218,7 +231,7 @@ def write(cfg, author, topic, news_items, *, instruction=None, current=None, exa
             warnings = [str(w) for w in out.get("warnings") or [] if str(w).strip().lower().strip(".") not in EMPTY_NOTES]
             d = Draft(res.post_text, str(out.get("hook", ""))[:200], [str(f) for f in out.get("facts_used") or []],
                       warnings, model, provider, attempt, res.hashtags)
-            return add_translation(cfg, d)
+            return add_translation(cfg, d, post_day(cfg, topic))
         last = res.message
         print(f"attempt {attempt}: guardrail {res.message}")
         note = guardrail.retry_note(res)
