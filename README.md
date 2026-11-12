@@ -80,7 +80,7 @@ gh secret set CLOUDFLARE_API_TOKEN
 gh secret set PROJECTS_TOKEN           # optional: project posts about private repos (fine-grained token, those repos, Contents: read-only)
 gh variable set LINKEDIN_TOKEN_EXPIRES --body 2027-01-08   # the date 60 days after you generated the token
 ```
-Optional variables: `PUBLISH_MODE` (`simulated` by default, set to `linkedin` to post for real) and `TIMEZONE` (for "today" in prompts and "On this day", and the clock `/schedule` times are read in, e.g. `Europe/London`).
+Optional variables: `PUBLISH_MODE` (`simulated` or `linkedin`; overrides `publish_mode` in `config.yml`, which is currently `linkedin`, so set it to `simulated` before trying it out) and `TIMEZONE` (for "today" in prompts and "On this day", and the clock `/schedule` times are read in, e.g. `Europe/London`).
 
 ### 5. Try it
 1. Actions → *Draft a post* → *Run workflow*. A `draft` issue appears within a minute.
