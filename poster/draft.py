@@ -199,8 +199,10 @@ def main():
     extra = token_warnings(cfg)
     if topic["kind"] == "onthisday":
         d = date.fromisoformat(topic["otd_date"])
+        how = ("**`/schedule hebrew next`** and **`/schedule english next`** post each version in that day's slots"
+               if compose.separate(cfg) and compose.bilingual(cfg)[0] else "**`/schedule next`** posts it in that day's slot")
         extra.append(f"Written for {d.strftime('%A')} {d.day} {d.strftime('%B')}, the next posting day with nothing else on it. "
-                     "**`/schedule next`** posts it in that day's slot; on another day `/approve` asks you to confirm.")
+                     f"{how}; on another day `/approve` asks you to confirm.")
     if topic["kind"] == "queued" and not profile:
         extra.append("Your topic was drafted without a profile, so the model only had the title and notes.")
     try:
